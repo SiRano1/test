@@ -16,6 +16,8 @@ import { hearts } from '../../game/state';
 import { countItem } from '../../game/systems/inventory';
 import { rotatingPrice } from '../../game/systems/economy';
 import { SEASONS } from '../../game/systems/calendar';
+import { epilogue, type EndingId } from '../../data/endings';
+import { FACTIONS, repTier } from '../../data/factions';
 import { WEATHER_ICONS, seasonName, weekday } from '../../game/systems/calendar';
 import { formatAffix, itemName, RARITY_NAMES } from '../../game/systems/loot';
 import { classLevel, classXpToNext, xpToNext } from '../../game/systems/stats';
@@ -129,6 +131,7 @@ export class Ui {
       ev.on('dayStart', (d) => this.dayText(d.text)),
       ev.on('boss', () => this.renderBoss()),
       ev.on('panel', () => this.renderPanel()),
+      ev.on('ending', (e) => (e ? this.showEnding(e.id) : undefined)),
       ev.on('tierEnter', (e) => this.dayText(`${tr('tierTitle', { n: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][e.tier - 1] ?? e.tier })} · ${t(tierForFloor(e.tier * 10 - 9).name)}`)),
       ev.on('scene', () => {
         this.renderQuick();
@@ -325,8 +328,12 @@ export class Ui {
       );
       this.dialogueEl.append(list);
     } else if (done) this.dialogueEl.append(h('div', { class: 'more' }, '▼'));
-    if (done && d.line.id !== 'gift' && !d.line.id.startsWith('thanks') && g.canGift(d.npc))
-      this.dialogueEl.append(h('button', { style: 'position:absolute;right:16px;top:-9px;font-size:7px', onclick: () => this.openGiftPicker() }, `🎁 ${tr('gift')}`));
+    const extra = h('div', { style: 'position:absolute;right:16px;top:-9px;display:flex;gap:2px' });
+    if (done && d.line.id !== 'gift' && !d.line.id.startsWith('thanks') && d.npc !== 'halvard') {
+      if (g.canGift(d.npc)) extra.append(h('button', { style: 'font-size:7px', onclick: () => this.openGiftPicker() }, `🎁 ${tr('gift')}`));
+      if (g.canInvite(d.npc)) extra.append(h('button', { style: 'font-size:7px', onclick: () => { g.inviteCompanion(d.npc); this.renderDialogue(); } }, `⚔ ${tr('invite')}`));
+    }
+    if (extra.childElementCount) this.dialogueEl.append(extra);
     this.dialogueEl.onclick = (e) => {
       if ((e.target as HTMLElement).tagName !== 'BUTTON') this.advanceDialogue();
     };
@@ -543,7 +550,18 @@ export class Ui {
   private renderRelations(body: HTMLElement, g: Game): void {
     const s = g.state;
     const col = h('div', { class: 'col', style: 'width:100%;overflow-y:auto' });
-    const met = Object.keys(NPCS).filter((id) => s.flags[`dlg:${id}_meet`] || s.npcs[id]);
+    col.append(h('h2', null, tr('factions')));
+    for (const f of FACTIONS) {
+      const v = s.factions[f.id];
+      col.append(h('div', { class: 'row', style: 'justify-content:flex-start;gap:6px;font-size:7px' },
+        h('span', { style: 'width:150px' }, t(f.name)),
+        h('div', { class: 'bar', style: 'width:80px;height:4px' }, h('i', { style: `background:${v >= 0 ? 'var(--st)' : 'var(--hp)'};transform:scaleX(${Math.abs(v) / 100})` })),
+        h('span', { class: 'num', style: 'width:26px' }, `${Math.round(v)}`),
+        h('span', { style: 'width:60px;color:var(--gold)' }, repTier(v)),
+        h('span', { style: 'color:var(--ink-dim);font-size:6px' }, t(f.perk))));
+    }
+    col.append(h('h2', { style: 'margin-top:4px' }, tr('relations')));
+    const met = Object.keys(NPCS).filter((id) => id !== 'halvard' && (s.flags[`dlg:${id}_meet`] || s.npcs[id]));
     if (!met.length) col.append(h('div', { class: 'help' }, t(L('Вы ещё ни с кем не знакомы.', "You haven't met anyone yet."))));
     for (const id of met) {
       const n = NPCS[id]!;
@@ -848,6 +866,46 @@ export class Ui {
       h('button', { onclick: close, id: 'death-ok' }, tr('continue')),
     );
     show(this.overlayEl, true);
+  }
+
+  // ───────────────────────── Эпилог ─────────────────────────
+
+  private showEnding(id: EndingId): void {
+    const g = this.game!;
+    const ep = epilogue(id, g.state);
+    let i = 0;
+    this.overlayBlocking = true;
+    g.paused = true;
+    const draw = () => {
+      clear(this.overlayEl);
+      this.overlayEl.style.background = '#050308f0';
+      const last = i >= ep.slides.length;
+      this.overlayEl.append(
+        h('div', { class: 'sub', style: 'color:var(--ink-dim);font-size:7px;letter-spacing:1px' }, tr('epilogue').toUpperCase()),
+        h('h1', null, t(ep.title)),
+        last
+          ? h('p', { style: 'font-size:10px;color:var(--gold)' }, tr('theEnd'))
+          : h('p', { style: 'max-width:330px;font-size:9px;line-height:1.55' }, t(ep.slides[i]!)),
+        h('button', {
+          id: 'death-ok',
+          onclick: () => {
+            if (!last) {
+              i++;
+              this.audio.play('ui');
+              return draw();
+            }
+            show(this.overlayEl, false);
+            this.overlayEl.style.background = '';
+            this.overlayBlocking = false;
+            g.paused = false;
+            g.finishEnding();
+          },
+        }, last ? tr('continueGame') : tr('next')),
+        h('div', { class: 'sub', style: 'font-size:6px;color:var(--ink-dim)' }, last ? '' : `${i + 1} / ${ep.slides.length}`),
+      );
+      show(this.overlayEl, true);
+    };
+    draw();
   }
 
   // ───────────────────────── Пауза ─────────────────────────

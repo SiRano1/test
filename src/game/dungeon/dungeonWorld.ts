@@ -60,7 +60,7 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   mark(ex, ey);
 
   if (bossFloor) {
-    if (bossAlive && layout.boss) {
+    if (bossAlive && layout.boss && !(floor === 70 && s.flags.free_fight)) {
       const b = new Boss(tier.boss, layout.boss.x, layout.boss.y, floor);
       b.arena = layout.boss.arena;
       w.addNow(b);

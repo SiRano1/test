@@ -7,6 +7,7 @@ import { tr } from '../data/strings';
 import { isElevatorFloor, MAX_STORY_FLOOR } from '../data/tiers';
 import '../data/dialogue';
 import '../data/dialogue2';
+import '../data/dialogue3';
 import { buildDungeon } from './dungeon/dungeonWorld';
 import type { Actor } from './entities/entity';
 import { Npc } from './entities/npc';
@@ -38,8 +39,12 @@ import { growNight, initGarden, isRainy } from './systems/garden';
 import { countItem, removeItem } from './systems/inventory';
 import { rotatingPrice } from './systems/economy';
 import { weekday } from './systems/calendar';
+import { Companion } from './entities/companion';
+import { Boss } from './entities/boss';
+import { endingConditions, THRONE_PAGES, type EndingId } from '../data/endings';
+import { FACTIONS, RIVALRY } from '../data/factions';
 
-export type Mode = 'play' | 'dialogue' | 'shop' | 'elevator' | 'lore' | 'dead' | 'craft' | 'storage' | 'build' | 'service';
+export type Mode = 'play' | 'dialogue' | 'shop' | 'elevator' | 'lore' | 'dead' | 'craft' | 'storage' | 'build' | 'service' | 'auction' | 'shopfront';
 export type Service = 'sharpen' | 'enchant' | 'reroll';
 export type ItemRef = { inv: number } | { equip: EquipSlot };
 
@@ -241,6 +246,11 @@ export class Game implements GameApi, DialogueHost {
     world.addNow(p);
     this.world = world;
     this.player = p;
+    if (ref.kind === 'dungeon') {
+      const c = this.state.companion;
+      if (c && c.day === this.state.time.totalDays && !c.down) this.spawnCompanion(world, c.npc, p.x + 14, p.y);
+      if (ref.floor === 70 && this.state.flags.free_fight && !this.state.ending) this.spawnFreeFight(world);
+    }
     this.scene = ref;
     this.boss = null;
     this.events.emit('boss', { actor: null });
@@ -394,7 +404,12 @@ export class Game implements GameApi, DialogueHost {
     this.events.emit('boss', { actor: e });
   }
 
-  bossDefeated(floor: number): void {
+  bossDefeated(floor: number, id?: string): void {
+    if (id === 'hunger_avatar') {
+      setTimeout(() => this.chooseEnding('free', true), 2500);
+      return;
+    }
+    if (id === 'halvard') setTimeout(() => this.startEnding(), 2500);
     const d = this.state.dungeon;
     if (!d.bosses.includes(floor)) d.bosses.push(floor);
     // открыть лестницу вниз на арене
@@ -408,6 +423,23 @@ export class Game implements GameApi, DialogueHost {
   // ───────────────────────── Смерть, сон, новый день ─────────────────────────
 
   onPlayerDeath(): void {
+    // компаньон с 8+ ♥ один раз за день поднимает героя
+    const comp = this.world.entities.find((e): e is Companion => e instanceof Companion && !e.dead && e.canRevive);
+    if (comp && this.state.companion && !this.state.companion.revived) {
+      this.state.companion.revived = true;
+      comp.canRevive = false;
+      const p = this.player;
+      setTimeout(() => {
+        p.dead = false;
+        p.state = 'free';
+        p.hp = Math.round(p.maxHp * 0.4);
+        p.invuln = 2;
+        this.world.fx({ t: 'sparkle', x: p.x, y: p.y - 10, color: '#fff0a0', n: 24 });
+        this.world.fx({ t: 'sfx', id: 'heal' });
+        this.toast(tr('revived', { name: t(comp.def.name) }), '#fff0a0');
+      }, 900);
+      return;
+    }
     this.mode = 'dead';
     this.deathTimer = 2.2;
   }
@@ -455,10 +487,28 @@ export class Game implements GameApi, DialogueHost {
   /** Начать новый день: календарь, восстановление, автосохранение. */
   private newDay(tired: boolean): void {
     const rained = isRainy(this.state.time.weather);
+    this.state.companion = null;
     advanceDay(this.state);
     dailyEconomy(this.state);
     const withered = growNight(this.state, rained, this.state.time.season);
     if (withered) this.toast(tr('withered', { n: withered }), '#c0a080');
+    // романтика: свадьба и утренние хлопоты супруга
+    const rom = this.state.romance;
+    if (rom.stage === 'engaged' && this.state.time.totalDays >= rom.weddingDay && rom.partner) {
+      rom.stage = 'married';
+      this.friendship(rom.partner, 500);
+      setTimeout(() => this.toast(tr('married', { name: t(npcDef(rom.partner!).name) }), '#ff8aa0'), 1600);
+    } else if (rom.stage === 'married' && rom.partner) {
+      const r = this.rng.next();
+      if (r < 0.4) {
+        const food = this.rng.pick(['bread', 'cheese', 'honey_bread', 'baked_potato', 'herb_stew']);
+        addToContainer(this.state.storage, makeItem(this.rng, food, 0, 1));
+        setTimeout(() => this.toast(tr('spouseBreakfast', { name: t(npcDef(rom.partner!).name) }), '#ffd0a0'), 1600);
+      } else if (r < 0.75 && this.state.manor.garden.length) {
+        for (const p of this.state.manor.garden) if (p.seed) p.watered = true;
+        setTimeout(() => this.toast(tr('spouseWatered', { name: t(npcDef(rom.partner!).name) }), '#a0d0ff'), 1600);
+      }
+    }
     const b = this.state.manor.building;
     if (b) {
       b.daysLeft--;
@@ -560,7 +610,10 @@ export class Game implements GameApi, DialogueHost {
       this.state.lore.push(id);
       this.toast(tr('loreFound'), '#ffe0a0');
       this.world.fx({ t: 'sfx', id: 'lore' });
+      if (id === 'chronicle_2') this.give('true_chronicle');
+      if (id === 'relay_key') this.give('relay_key');
     }
+    if (id === 'edmund_letter') this.state.flags.edmund_letter_read = true;
     this.loreOpen = id;
     this.mode = 'lore';
     this.events.emit('lore', { id });
@@ -856,9 +909,86 @@ export class Game implements GameApi, DialogueHost {
     this.toast(tr('recipeLearned', { name: t(itemDef(r.output[0]).name) }), '#a0ffa0');
   }
 
-  rep(f: FactionId, delta: number): void {
-    const v = this.state.factions[f] + delta;
-    this.state.factions[f] = Math.max(-100, Math.min(100, v));
+  /** Изменить репутацию; соперники фракции реагируют вполовину (см. RIVALRY). */
+  rep(f: FactionId, delta: number, spill = true): void {
+    const before = this.state.factions[f];
+    this.state.factions[f] = Math.max(-100, Math.min(100, before + delta));
+    if (spill) for (const [other, k] of Object.entries(RIVALRY[f]) as [FactionId, number][]) this.rep(other, delta * k * 0.5, false);
+    if (spill && delta !== 0) this.toast(`${t(FACTIONS.find((x) => x.id === f)!.name)} ${delta > 0 ? '+' : ''}${delta}`, delta > 0 ? '#a0e0a0' : '#e0a0a0');
+  }
+
+  // ───────────────────────── Компаньоны ─────────────────────────
+
+  canInvite(npc: string): boolean {
+    const d = npcDef(npc);
+    const c = this.state.companion;
+    return !!d.companion && npc !== 'halvard' && hearts(this.state, npc) >= 4 && this.state.time.minutes < 18 * 60 && !(c && c.day === this.state.time.totalDays);
+  }
+
+  inviteCompanion(npc: string): void {
+    if (!this.canInvite(npc)) return;
+    this.state.companion = { npc, day: this.state.time.totalDays, revived: false, down: false };
+    this.toast(tr('companionJoined', { name: t(npcDef(npc).name) }), '#a0d0ff');
+  }
+
+  private spawnCompanion(world: World, npc: string, x: number, y: number): Companion {
+    const h = hearts(this.state, npc);
+    const c = new Companion(npc, x, y, this.state.hero.level, h, npc !== 'halvard' && h >= 8 && !this.state.companion?.revived);
+    world.addNow(c);
+    return c;
+  }
+
+  // ───────────────────────── Финалы ─────────────────────────
+
+  /** После победы над Хальвардом: разговор у Трона и выбор. */
+  startEnding(): void {
+    if (this.state.ending) return;
+    const cond = endingConditions(this.state);
+    const choices = [
+      { text: L('Восстановить Печать.', 'Restore the Seal.'), act: () => this.chooseEnding('restore') },
+      { text: L('Разбить Печать и освободить тебя.', 'Break the Seal and set you free.'), act: () => this.chooseEnding('free') },
+    ];
+    if (cond.take) choices.push({ text: L('Вложить ключ эстафеты. Я займу твоё место.', 'Set the relay key. I will take your place.'), act: () => this.chooseEnding('take') });
+    this.dialogue = new DialogueRunner(this, 'halvard', { id: 'throne', npc: 'halvard', priority: 0, pages: THRONE_PAGES, choices });
+    this.mode = 'dialogue';
+    this.events.emit('dialogue', undefined);
+  }
+
+  chooseEnding(id: EndingId, afterFight = false): void {
+    if (id === 'free' && !afterFight) {
+      if (!endingConditions(this.state).free) return this.chooseEnding('bad');
+      // добрый финал: последний бой вместе с королём
+      this.state.flags.free_fight = true;
+      this.spawnFreeFight(this.world);
+      this.toast(tr('kingJoins'), '#c8a8ff');
+      return;
+    }
+    this.state.ending = id;
+    this.state.flags[`ending_${id}`] = true;
+    this.state.flags.free_fight = false;
+    this.mode = 'play';
+    this.events.emit('ending', { id });
+  }
+
+  /** Аватар Голода и союзник Хальвард посреди арены. */
+  spawnFreeFight(w: World): void {
+    const rooms = w.meta.rooms as { role: string; x: number; y: number; w: number; h: number }[] | undefined;
+    const ar = rooms?.find((r) => r.role === 'boss');
+    if (!ar) return;
+    const cx = (ar.x + ar.w / 2) * 16, cy = (ar.y + 4) * 16;
+    const b = new Boss('hunger_avatar', cx, cy, 70);
+    b.arena = { x: ar.x * 16, y: ar.y * 16, w: ar.w * 16, h: ar.h * 16 };
+    w.add(b);
+    b.wake(w);
+    const p = this.player;
+    const king = new Companion('halvard', p.x + 20, p.y, this.state.hero.level, 10, false);
+    w.add(king);
+  }
+
+  /** Эпилог прочитан: вернуться в город (пост-гейм). */
+  finishEnding(): void {
+    this.events.emit('ending', null);
+    this.goTo({ kind: 'town' }, doorSpawn('crypt'));
   }
 
   // ───────────────────────── Крафт, склад, стройка, услуги ─────────────────────────
@@ -1014,9 +1144,64 @@ export class Game implements GameApi, DialogueHost {
     return !ns.giftedToday && (ns.giftsWeek < 2 || bday);
   }
 
+  /** Лента и амулет клятвы: особые «подарки» романтики. true — обработано. */
+  private romanceGift(npc: string, index: number): boolean {
+    const s = this.state.inventory[index]!;
+    const def = npcDef(npc);
+    const rom = this.state.romance;
+    const h = hearts(this.state, npc);
+    const say = (pages: import('../data/loc').Loc[]) => {
+      this.dialogue = new DialogueRunner(this, npc, { id: 'gift', npc, priority: 0, pages });
+      this.mode = 'dialogue';
+      this.events.emit('dialogue', undefined);
+    };
+    const consume = () => {
+      s.qty--;
+      if (s.qty <= 0) this.state.inventory[index] = null;
+      this.events.emit('inventory', undefined);
+    };
+    if (s.def === 'silver_ribbon') {
+      if (!def.romance || rom.partner) {
+        say([L('Это… очень мило. Но я не могу это принять.', "That's… very sweet. But I can't accept it.")]);
+        return true;
+      }
+      if (h < 8) {
+        say([L('Серебряная лента? Ой… Кажется, ещё рано. Давай получше узнаем друг друга.', "A silver ribbon? Oh… I think it's too soon. Let's get to know each other better.")]);
+        return true;
+      }
+      consume();
+      rom.partner = npc;
+      rom.stage = 'dating';
+      this.friendship(npc, 150);
+      say([L('Лента… Да. Да! Я так надеялся(лась), что ты спросишь.', 'A ribbon… Yes. Yes! I so hoped you would ask.'), L('Теперь все в Вальмарке будут знать. И пусть знают.', 'Now all of Valmark will know. And let them.')]);
+      this.world.fx({ t: 'sfx', id: 'levelup' });
+      return true;
+    }
+    if (s.def === 'oath_amulet') {
+      if (rom.partner !== npc || rom.stage !== 'dating' || h < 10) {
+        say([L('Амулет клятвы?.. Не сейчас. Не так.', "An oath amulet?.. Not now. Not like this.")]);
+        return true;
+      }
+      if (!this.state.manor.upgrades.includes('hall')) {
+        say([L('Я согласен(на)! Но… может, сначала залатаем крышу в твоей усадьбе? Жить под дырявой крышей — романтично только в балладах.', "I accept! But… maybe patch the roof of your manor first? Living under a leaky roof is only romantic in ballads.")]);
+        return true;
+      }
+      consume();
+      rom.stage = 'engaged';
+      rom.weddingDay = this.state.time.totalDays + 3;
+      say([L('Да. Тысячу раз да. Свадьба через три дня — в храме. Брат Тео уже бежит за свечами.', 'Yes. A thousand times yes. The wedding is in three days — at the temple. Brother Theo is already running for candles.')]);
+      this.toast(tr('weddingSoon', { name: t(def.name) }), '#ff8aa0');
+      this.world.fx({ t: 'sfx', id: 'levelup' });
+      return true;
+    }
+    return false;
+  }
+
   giveGift(npc: string, index: number): void {
     const s = this.state.inventory[index];
-    if (!s || !this.canGift(npc)) return;
+    if (!s) return;
+    if ((s.def === 'silver_ribbon' || s.def === 'oath_amulet') && this.romanceGift(npc, index)) return;
+    if (!this.canGift(npc)) return;
     const d = itemDef(s.def);
     if (d.kind === 'quest') return;
     const def = npcDef(npc);
@@ -1125,6 +1310,17 @@ export class Game implements GameApi, DialogueHost {
 
   hasItem(def: string, n = 1): boolean {
     return countItem(this.state.inventory, def) >= n;
+  }
+
+  take(def: string, n = 1): boolean {
+    const ok = removeItem(this.state.inventory, def, n);
+    if (ok) this.events.emit('inventory', undefined);
+    return ok;
+  }
+
+  openAuction(): void {
+    this.mode = 'auction';
+    this.events.emit('panel', { kind: 'auction' });
   }
 
   itemExists(def: string): boolean {

@@ -47,31 +47,31 @@ export const TIERS: TierDef[] = [
   {
     id: 3, name: L('Грибной лес', 'The Fungal Forest'), floors: [21, 30],
     palette: { floor: ['#2e3a2c', '#28332a', '#354332'], wall: '#56456a', wallDark: '#3a2e4a', top: '#140f1a', accent: '#6fe3d0', dark: '#05080a', mote: '#c8e880' },
-    monsters: [['leech', 3]], elites: [], ores: [['iron_ore', 3], ['coal', 3]], boss: 'gorm', darkness: 0.8,
+    monsters: [['sporeling', 4], ['shroom_runner', 4], ['glow_spider', 3], ['leech', 1]], elites: ['myco_golem'], ores: [['iron_ore', 3], ['coal', 3], ['stone', 1]], boss: 'spore_mother', darkness: 0.8,
     decor: ['mushroom', 'glowshroom', 'root'], breakable: 'pod',
   },
   {
     id: 4, name: L('Кузни гномов', 'The Dwarven Forges'), floors: [31, 40],
     palette: { floor: ['#4a3b30', '#41332a', '#534337'], wall: '#6e4c3a', wallDark: '#4a3226', top: '#1e120e', accent: '#ff7a30', dark: '#0a0504', mote: '#ffb060' },
-    monsters: [['drowned', 3]], elites: [], ores: [['silver_ore', 5], ['coal', 3]], boss: 'gorm', darkness: 0.75,
+    monsters: [['ember_golem', 4], ['clockwork', 3], ['fire_imp', 3]], elites: ['hollow_armor'], ores: [['silver_ore', 5], ['coal', 3]], boss: 'brodrik', darkness: 0.75,
     decor: ['anvil', 'pipe', 'brazier'], breakable: 'crate',
   },
   {
     id: 5, name: L('Ледяная библиотека', 'The Frozen Library'), floors: [41, 50],
     palette: { floor: ['#5a6878', '#52606f', '#647384'], wall: '#8a9aae', wallDark: '#5e6c80', top: '#161d28', accent: '#bfefff', dark: '#03060c', mote: '#ffffff' },
-    monsters: [['drowned', 3]], elites: [], ores: [['adamant_ore', 5], ['frost_crystal', 2]], boss: 'gorm', darkness: 0.85,
+    monsters: [['ice_wraith', 3], ['book_swarm', 4], ['frost_wolf', 3]], elites: ['page_keeper'], ores: [['adamant_ore', 5], ['frost_crystal', 2]], boss: 'keeper_silence', darkness: 0.85,
     decor: ['bookshelf', 'icicle', 'desk'], breakable: 'books',
   },
   {
     id: 6, name: L('Пылающий собор', 'The Burning Cathedral'), floors: [51, 60],
     palette: { floor: ['#5a4442', '#503c3a', '#654d4a'], wall: '#7e5c52', wallDark: '#583e36', top: '#240e0e', accent: '#ffb040', dark: '#0a0404', mote: '#ffa040' },
-    monsters: [['drowned', 3]], elites: [], ores: [['obsidian', 4], ['ash_stone', 3]], boss: 'gorm', darkness: 0.7,
+    monsters: [['ash_acolyte', 4], ['fire_seraph', 3], ['pilgrim', 3]], elites: ['inquisitor'], ores: [['obsidian', 4], ['ash_stone', 3]], boss: 'ash_seraph', darkness: 0.7,
     decor: ['pew', 'brazier', 'statue'], breakable: 'urn',
   },
   {
     id: 7, name: L('Тронный зал', 'The Throne Hall'), floors: [61, 70],
     palette: { floor: ['#2c2433', '#261f2d', '#33293b'], wall: '#4e3e60', wallDark: '#342942', top: '#0c0912', accent: '#c8a8ff', dark: '#020104', mote: '#a080ff' },
-    monsters: [['drowned', 3]], elites: [], ores: [['heartstone', 3], ['royal_gold', 2]], boss: 'gorm', darkness: 0.9,
+    monsters: [['royal_guard', 4], ['shade', 4]], elites: ['abyss_knight'], ores: [['heartstone', 3], ['royal_gold', 2]], boss: 'halvard', darkness: 0.9,
     decor: ['banner', 'statue', 'chain'], breakable: 'urn',
   },
 ];

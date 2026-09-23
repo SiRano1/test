@@ -65,6 +65,14 @@ export interface GameState {
   recipes: string[];
   /** Узнанные реакции на подарки: npc → item → реакция. */
   giftLog: Record<string, Record<string, GiftReaction>>;
+  /** Компаньон на сегодняшний спуск. */
+  companion: { npc: string; day: number; revived: boolean; down: boolean } | null;
+  /** Выбранный финал (после Тронного зала). */
+  ending: 'restore' | 'free' | 'take' | 'bad' | null;
+  /** Отношения: встречаемся / помолвка / брак. */
+  romance: { partner: string | null; stage: 'dating' | 'engaged' | 'married' | null; weddingDay: number };
+  /** Очки навыков, вложенные в деревья: id узла → true. */
+  talents: string[];
   /** Где герой находится (для загрузки). Подземелье не сохраняется — загрузка у склепа. */
   location: { scene: SceneRef; x: number; y: number };
   playtime: number;
@@ -124,6 +132,10 @@ export function newGameState(name: string, seed: number): GameState {
     quests: {},
     recipes: [],
     giftLog: {},
+    companion: null,
+    ending: null,
+    romance: { partner: null, stage: null, weddingDay: 0 },
+    talents: [],
     location: { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 },
     playtime: 0,
     settings: { lang: 'ru', volume: 0.6, shake: true },

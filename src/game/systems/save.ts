@@ -64,6 +64,10 @@ export function migrate(data: any): GameState {
   data.quests ??= {};
   data.recipes ??= [];
   data.giftLog ??= {};
+  data.companion ??= null;
+  data.ending ??= null;
+  data.romance ??= { partner: null, stage: null, weddingDay: 0 };
+  data.talents ??= [];
   data.flags ??= {};
   data.stats ??= {};
   data.location ??= { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 };

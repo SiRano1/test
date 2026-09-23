@@ -265,6 +265,16 @@ SHARD_NAMES.forEach((n, i) =>
   }),
 );
 
+const quest = (id: string, ru: string, en: string, dru: string, den: string, shape: string, c1: string, c2: string, g: Gender = 'm') =>
+  add({ id, kind: 'quest', name: L(ru, en), desc: L(dru, den), icon: { shape, c1, c2 }, price: 0, stack: 1, tier: 0, gender: g, tags: ['key'] });
+quest('true_chronicle', 'Подлинная летопись', 'The True Chronicle', 'Второй том летописи Эрдхейма. Кому его отдать — решать вам.', "The second volume of Erdheim's chronicle. Whom to give it to is your choice.", 'scroll', '#e8d8a8', '#6a2a1a', 'f');
+quest('relay_key', 'Ключ эстафеты', 'The Relay Key', 'Ключ из сердцекамня. «Тот, кто вложит ключ в Трон, примет ношу добровольно».', 'A heartstone key. "Whoever sets the key into the Throne takes up the burden of their own will."', 'shard', '#ff8a6a', '#8a1a2a');
+quest('edmund_letter', 'Письмо Эдмунда', "Edmund's Letter", 'Завещание основателя Ордена Стражи.', 'The testament of the founder of the Order of the Watch.', 'scroll', '#d8c8a0', '#6a4a2a', 'n');
+
+// Романтика
+add({ id: 'silver_ribbon', kind: 'gift', name: L('Серебряная лента', 'Silver Ribbon'), desc: L('Подарите тому, кто дорог (8 ♥), — и вы начнёте встречаться.', 'Give it to someone dear (8 ♥) to begin courting.'), icon: { shape: 'cloth', c1: '#dfe8f8', c2: '#9aa8c8' }, price: 800, stack: 1, tier: 0, gender: 'f', tags: ['romance'] });
+add({ id: 'oath_amulet', kind: 'gift', name: L('Амулет клятвы', 'Oath Amulet'), desc: L('Предложение руки и сердца (10 ♥, после ленты).', 'A marriage proposal (10 ♥, after the ribbon).'), icon: { shape: 'amulet', c1: '#ffd060', c2: '#ff5a6a' }, price: 3000, stack: 1, tier: 0, gender: 'm', tags: ['romance'] });
+
 // ───────────────────────────── Названия классов ─────────────────────────────
 
 export const CLASS_NAMES: Record<WeaponClass, Loc> = {

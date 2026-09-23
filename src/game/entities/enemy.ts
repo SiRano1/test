@@ -48,6 +48,8 @@ export class Enemy extends Actor {
   summoned: Enemy[] = [];
   /** Призван другим монстром (не даёт лута). */
   minion = false;
+  /** Множитель длительности замаха (боссы в ярости замахиваются быстрее). */
+  windupMul = 1;
   wobble = Math.random() * 10;
 
   constructor(id: string, x: number, y: number, public floor: number) {
@@ -80,7 +82,7 @@ export class Enemy extends Actor {
   telegraph(): Telegraph | null {
     if (this.state !== 'windup' || !this.atk) return null;
     const a = this.atk;
-    const p = Math.min(1, this.st / a.windup);
+    const p = Math.min(1, this.st / (a.windup * this.windupMul));
     switch (a.kind) {
       case 'arc':
         return { kind: 'arc', x: this.x, y: this.y - 4, angle: this.lockAngle, r: a.radius ?? 20, half: a.arc ?? 1, p };
@@ -161,9 +163,10 @@ export class Enemy extends Actor {
       case 'windup': {
         const a = this.atk!;
         // отслеживаем цель, кроме последних 30% замаха
-        if (p && this.st < a.windup * 0.7 && a.kind !== 'slam') this.lockAngle = this.turnToward(this.lockAngle, Math.atan2(p.y - this.y, p.x - this.x), 4 * dt);
+        const wind = a.windup * this.windupMul;
+        if (p && this.st < wind * 0.7 && a.kind !== 'slam') this.lockAngle = this.turnToward(this.lockAngle, Math.atan2(p.y - this.y, p.x - this.x), 4 * dt);
         this.facingFrom(this.lockAngle);
-        if (this.st >= a.windup) {
+        if (this.st >= wind) {
           this.setState('active');
           this.execute(w, a);
         }
@@ -377,7 +380,7 @@ export class Enemy extends Actor {
     const gold = rng.int(this.def.gold[0], this.def.gold[1]);
     w.dropLoot(this.x, this.y - 4, stacks, Math.round(gold * floorScale(this.floor, this.def.tier)));
     w.game.state.stats[`kill_${this.def.id}`] = (w.game.state.stats[`kill_${this.def.id}`] ?? 0) + 1;
-    if (this.def.boss) w.game.bossDefeated(this.floor);
+    if (this.def.boss) w.game.bossDefeated(this.floor, this.def.id);
   }
 
   /** Угол между взглядом и направлением на цель (для ИИ блока/уклонения). */

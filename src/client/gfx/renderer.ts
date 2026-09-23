@@ -10,6 +10,7 @@ import { Player } from '../../game/entities/player';
 import { Projectile } from '../../game/entities/projectile';
 import { CrackedWall, GardenPlot, Prop, Spot, Trigger } from '../../game/entities/props';
 import { CROPS } from '../../data/items';
+import { Companion } from '../../game/entities/companion';
 import { growthStage } from '../../game/systems/garden';
 import type { Game } from '../../game/game';
 import { duskTint, townDarkness } from '../../game/systems/calendar';
@@ -107,7 +108,7 @@ export class Renderer {
     // тени
     for (const e of ents) {
       if (e.layer !== 1 || e.removed) continue;
-      if (e instanceof Player || e instanceof Enemy || e instanceof Npc || e instanceof Pickup) {
+      if (e instanceof Player || e instanceof Enemy || e instanceof Npc || e instanceof Pickup || e instanceof Companion) {
         const sw = e instanceof Boss ? 12 : e instanceof Pickup ? 4 : Math.max(5, e.hw + 1);
         ctx.fillStyle = 'rgba(0,0,0,0.3)';
         ctx.beginPath();
@@ -242,6 +243,23 @@ export class Renderer {
     if (x < -80 || y < -40 || x > VIEW_W + 80 || y > VIEW_H + 120) return;
     if (e instanceof Player) return this.drawPlayer(e, x, y);
     if (e instanceof Enemy) return this.drawEnemy(e, x, y);
+    if (e instanceof Companion) {
+      const [dir, flip] = FACING_DIR[e.facing]!;
+      const frame = e.moving && !e.dead ? ([1, 0, 2, 0] as const)[Math.floor(e.animT * 8) % 4]! : 0;
+      const img = this.bank.char(e.def.id, dir, frame);
+      if (e.facing === 3) this.drawCompanionWeapon(e, x, y);
+      this.blit(img, x, y, 8, 20, flip, e.flash, e.dead ? 0.4 : 1);
+      if (e.facing !== 3) this.drawCompanionWeapon(e, x, y);
+      if (!e.dead && e.hp < e.maxHp) {
+        const ctx = this.ctx;
+        const bx = Math.round(x - 7), by = Math.round(y - 26);
+        ctx.fillStyle = '#1a1014';
+        ctx.fillRect(bx - 1, by - 1, 16, 4);
+        ctx.fillStyle = '#58c858';
+        ctx.fillRect(bx, by, Math.max(1, Math.round((14 * e.hp) / e.maxHp)), 2);
+      }
+      return;
+    }
     if (e instanceof Npc) {
       const [dir, flip] = FACING_DIR[e.facing]!;
       const frame = e.moving ? ([1, 0, 2, 0] as const)[Math.floor(e.animT * 7) % 4]! : 0;
@@ -294,6 +312,19 @@ export class Renderer {
       this.blit(art.frames[f]!, x, y, art.ax, art.ay, false, e.flash);
       void w;
     }
+  }
+
+  private drawCompanionWeapon(e: Companion, x: number, y: number): void {
+    if (e.dead) return;
+    const ctx = this.ctx;
+    const icon = this.bank.icon(e.weaponIcon);
+    const a = e.swingT > 0 ? e.swingAngle + (0.2 - e.swingT) * 10 - 1 : [Math.PI / 2, Math.PI, 0, -Math.PI / 2][e.facing]! + 0.9;
+    ctx.save();
+    ctx.translate(Math.round(x + Math.cos(a) * 6), Math.round(y - 8 + Math.sin(a) * 6));
+    ctx.rotate(a + Math.PI / 4);
+    ctx.scale(0.8, 0.8);
+    ctx.drawImage(icon, -8, -8);
+    ctx.restore();
   }
 
   private drawPlot(e: GardenPlot, x: number, y: number): void {
@@ -528,6 +559,51 @@ export class Renderer {
         ctx.fillStyle = '#8fd0ff';
         ctx.fillRect(2, -1, 2, 2);
         break;
+      case 'spore':
+        ctx.fillStyle = 'rgba(200,232,128,0.45)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4 + Math.sin(e.animT * 12), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e8f8b0';
+        ctx.fillRect(-1, -1, 2, 2);
+        break;
+      case 'bolt_iron':
+        ctx.fillStyle = '#9aa0ac';
+        ctx.fillRect(-5, -1, 8, 2);
+        ctx.fillStyle = '#ffd060';
+        ctx.fillRect(3, -1, 2, 2);
+        break;
+      case 'fireball':
+        ctx.fillStyle = 'rgba(255,120,40,0.5)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffd040';
+        ctx.beginPath();
+        ctx.arc(1, 0, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,90,30,0.5)';
+        ctx.fillRect(-8, -1, 5, 2);
+        break;
+      case 'void':
+        ctx.fillStyle = 'rgba(40,10,60,0.8)';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#c040ff';
+        ctx.fillRect(-1, -1, 2, 2);
+        break;
+      case 'ice':
+        ctx.fillStyle = '#bfefff';
+        ctx.beginPath();
+        ctx.moveTo(6, 0);
+        ctx.lineTo(-4, -2);
+        ctx.lineTo(-4, 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(1, -1, 3, 1);
+        break;
       case 'wave':
         ctx.fillStyle = 'rgba(120,190,230,0.8)';
         ctx.fillRect(-3, -7, 6, 14);
@@ -575,11 +651,13 @@ export class Renderer {
         ctx.fillRect(0, 0, VIEW_W, VIEW_H);
       }
     }
+    const darkAura = !!w.meta.darkAura;
+    if (darkAura) dark = 0.97;
     if (dark <= 0.01) return;
     const lights: LightSrc[] = [];
     const p = w.player;
     if (p) {
-      const r = w.kind === 'dungeon' ? 92 : w.kind === 'interior' ? 70 : 56;
+      const r = darkAura ? 40 : w.kind === 'dungeon' ? 92 : w.kind === 'interior' ? 70 : 56;
       lights.push({ x: p.x, y: p.y - 8, r: r + Math.sin(this.time * 7) * 2, color: '#ffc880', power: 1 });
     }
     for (const e of w.entities) {

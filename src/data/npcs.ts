@@ -130,5 +130,10 @@ add({ id: 'hanna', name: L('Вдова Ханна', 'Widow Hanna'), role: L('Ф�
   gifts: g(['cheese', 'apple'], ['bread'], ['bone'], ['leech_slime']),
   look: { hair: '#8a6a4a', skin: '#e8b898', top: '#6a5a3a', bottom: '#4a4a3a', accent: '#c8c0a0', style: 'bun' } });
 
+// Не житель города: король под Троном (говорит в финале и сражается рядом в добром финале)
+add({ id: 'halvard', name: L('Хальвард', 'Halvard'), role: L('Король Эрдхейма', 'King of Erdheim'), romance: false, companion: 'sword', birthday: [0, 1],
+  gifts: g([], []),
+  look: { hair: '#c8c8d0', skin: '#c8b8b0', top: '#3a2a4a', bottom: '#241a30', accent: '#e0c060', style: 'short', beard: true } });
+
 /** Облик героя по умолчанию. */
 export const HERO_LOOK: Look = { hair: '#5a3a24', skin: '#f0c8a0', top: '#3a6a4a', bottom: '#4a3a2e', accent: '#c8a060', style: 'short' };

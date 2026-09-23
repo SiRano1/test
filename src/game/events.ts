@@ -32,6 +32,7 @@ export interface GameEvents extends Record<string, unknown> {
   levelUp: { level: number };
   menu: { open: string | null };
   autosave: void;
-  panel: { kind: 'craft' | 'storage' | 'build' | 'service' } | null;
+  panel: { kind: 'craft' | 'storage' | 'build' | 'service' | 'auction' | 'shopfront' } | null;
   tierEnter: { tier: number };
+  ending: { id: 'restore' | 'free' | 'take' | 'bad' } | null;
 }

@@ -300,6 +300,8 @@ export function monsterFrames(sprite: string): Grid[] {
         return g.outline(OUT);
       });
     default:
-      return [new Grid(16, 16).rect(4, 4, 8, 8, '#ff00ff').outline(OUT)];
+      return extraMonsterFrames(sprite) ?? [new Grid(16, 16).rect(4, 4, 8, 8, '#ff00ff').outline(OUT)];
   }
 }
+
+import { extraMonsterFrames } from './monsters2';

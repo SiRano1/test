@@ -21,6 +21,9 @@ export interface DialogueHost {
   rep(f: 'church' | 'mages' | 'traders' | 'watch', delta: number): void;
   learnRecipe(id: string): void;
   hasItem(def: string, n?: number): boolean;
+  take(def: string, n?: number): boolean;
+  readLore(id: string): void;
+  openAuction(): void;
 }
 
 export interface DChoice {

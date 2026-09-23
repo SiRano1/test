@@ -48,7 +48,7 @@ export const SHOPS: Record<string, ShopDef> = {
   grocer: {
     id: 'grocer', npc: 'marta', name: L('Лавка Марты', "Marta's Provisions"), sellMul: 1,
     stock: [
-      { item: 'bread' }, { item: 'cheese' }, { item: 'apple' }, { item: 'potion_small' }, { item: 'potion_stamina' },
+      { item: 'bread' }, { item: 'cheese' }, { item: 'apple' }, { item: 'potion_small' }, { item: 'potion_stamina' }, { item: 'silver_ribbon' },
       ...seedStock((c) => ['potato', 'turnip', 'pumpkin', 'winter_onion', 'wheat'].includes(c)),
     ],
     buys: (d) => d.kind === 'food' || tagged(d, 'veg', 'crop'),
@@ -71,6 +71,11 @@ export const SHOPS: Record<string, ShopDef> = {
     id: 'enchanter', npc: 'albin', name: L('Башня Серого Круга', 'Tower of the Grey Circle'), sellMul: 1, services: ['enchant', 'reroll'],
     stock: [{ item: 'potion_mana' }, { item: 'torch_oil' }, { item: 'ring' }, { item: 'amulet' }, { item: 'copper_staff' }, { item: 'iron_staff', deepest: 10 }],
     buys: (d) => tagged(d, 'gem', 'magic') || d.kind === 'accessory',
+  },
+  trading: {
+    id: 'trading', npc: 'livia', name: L('Торговый дом Кроу', 'House of Crowe'), sellMul: 1.05,
+    stock: [{ item: 'oath_amulet' }, { item: 'silver_ribbon' }, { item: 'glass' }, { item: 'potion_big', deepest: 30 }, { item: 'steel_bar', deepest: 21 }, { item: 'silver_bar', deepest: 31 }],
+    buys: (d) => tagged(d, 'gem', 'bar') || d.kind === 'accessory',
   },
   fence: {
     id: 'fence', npc: 'lis', name: L('Лавка Лис', "Lis's Den"), sellMul: 0.8, rotating: true,

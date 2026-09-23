@@ -97,6 +97,48 @@ export const SCHEDULES: Record<string, Schedule> = {
     base: [{ t: 0, at: off('church') }, { t: T(8), at: inn('church', 8, 4, 1, 0) }, { t: T(12), at: town(31, 13, 1) }, { t: T(13), at: inn('church', 8, 4, 1, 0) }, { t: T(20), at: off('church') }],
     rain: [{ t: 0, at: off('church') }, { t: T(8), at: inn('church', 8, 4, 1, 0) }, { t: T(20), at: off('church') }],
   },
+  veila: {
+    base: [{ t: 0, at: off('house2') }, { t: T(7), at: town(24, 36, 3) }, { t: T(12), at: inn('alchemy', 8, 6, 1) }, { t: T(14), at: town(8, 35, 3) }, { t: T(19), at: off('house2') }],
+    rain: [{ t: 0, at: off('house2') }, { t: T(9), at: inn('alchemy', 8, 6, 1) }, { t: T(17), at: off('house2') }],
+  },
+  ula: {
+    base: [{ t: 0, at: off('house2') }, { t: T(9), at: town(26, 23, 0, 0) }, { t: T(17), at: inn('tavern', 12, 9, 0, 3) }, { t: T(21), at: off('house2') }],
+    rain: [{ t: 0, at: off('house2') }, { t: T(11), at: inn('tavern', 12, 9, 0, 3) }, { t: T(21), at: off('house2') }],
+  },
+  sebastian: {
+    base: [{ t: 0, at: off('trading') }, { t: T(10), at: inn('trading', 10, 4, 2) }, { t: T(15), at: town(36, 20, 3) }, { t: T(18), at: inn('tavern', 13, 9, 0, 3) }, { t: T(23), at: off('trading') }],
+    rain: [{ t: 0, at: off('trading') }, { t: T(10), at: inn('trading', 10, 4, 2) }, { t: T(23), at: off('trading') }],
+  },
+  livia: {
+    base: [{ t: 0, at: off('trading') }, { t: T(8), at: inn('trading', 5, 3, 1) }, { t: T(20), at: off('trading') }],
+  },
+  ogden: {
+    base: [{ t: 0, at: off('trading') }, { t: T(9), at: town(31, 16, 2) }, { t: T(13), at: inn('trading', 11, 7, 1) }, { t: T(17), at: town(33, 24, 2) }, { t: T(20), at: off('trading') }],
+    rain: [{ t: 0, at: off('trading') }, { t: T(9), at: inn('trading', 11, 7, 1) }, { t: T(20), at: off('trading') }],
+  },
+  isolde: {
+    base: [{ t: 0, at: off('tower') }, { t: T(10), at: inn('tower', 8, 4, 1) }, { t: T(22), at: off('tower') }],
+  },
+  nisa: {
+    base: [{ t: 0, at: off('tower') }, { t: T(8), at: inn('tower', 2, 8, 1) }, { t: T(12), at: town(40, 24, 3) }, { t: T(15), at: inn('tower', 2, 8, 1) }, { t: T(19), at: inn('tavern', 14, 6, 0, 1) }, { t: T(23), at: off('tower') }],
+    rain: [{ t: 0, at: off('tower') }, { t: T(8), at: inn('tower', 2, 8, 1) }, { t: T(23), at: off('tower') }],
+  },
+  corvin: {
+    base: [{ t: 0, at: off('tower') }, { t: T(11), at: town(13, 15, 1) }, { t: T(16), at: inn('tower', 7, 8, 1) }, { t: T(22), at: off('tower') }],
+    rain: [{ t: 0, at: off('tower') }, { t: T(11), at: inn('tower', 7, 8, 1) }, { t: T(22), at: off('tower') }],
+  },
+  daren: {
+    base: [{ t: 0, at: off('tavern') }, { t: T(9), at: town(10, 26, 4) }, { t: T(13), at: inn('tavern', 3, 9, 0, 0) }, { t: T(16), at: town(44, 26, 4) }, { t: T(20), at: inn('tavern', 3, 9, 0, 0) }, { t: T(25), at: off('tavern') }],
+    rain: [{ t: 0, at: off('tavern') }, { t: T(10), at: inn('tavern', 3, 9, 0, 0) }, { t: T(25), at: off('tavern') }],
+  },
+  theo: {
+    base: [{ t: 0, at: off('church') }, { t: T(7), at: inn('church', 12, 6, 2) }, { t: T(12), at: town(14, 12, 2) }, { t: T(14), at: inn('church', 12, 6, 2) }, { t: T(21), at: off('church') }],
+    rain: [{ t: 0, at: off('church') }, { t: T(7), at: inn('church', 12, 6, 2) }, { t: T(21), at: off('church') }],
+  },
+  erik: {
+    base: [{ t: 0, at: off('smithy') }, { t: T(7), at: inn('smithy', 2, 6, 1) }, { t: T(12), at: town(34, 16, 3) }, { t: T(15), at: inn('smithy', 2, 6, 1) }, { t: T(19), at: inn('tavern', 9, 9, 0, 3) }, { t: T(22), at: off('smithy') }],
+    rain: [{ t: 0, at: off('smithy') }, { t: T(7), at: inn('smithy', 2, 6, 1) }, { t: T(22), at: off('smithy') }],
+  },
   hanna: {
     base: [{ t: 0, at: off('cottage') }, { t: T(7), at: town(14, 44, 4) }, { t: T(16), at: town(27, 18, 1) }, { t: T(19), at: off('cottage') }],
     rain: [{ t: 0, at: off('cottage') }],

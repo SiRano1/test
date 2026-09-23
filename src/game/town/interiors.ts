@@ -128,6 +128,18 @@ const INTERIORS: Record<string, InteriorSpec> = {
     ],
     counter: { x: 3, y: 7, w: 5, shop: 'enchanter', npc: 'albin' },
   },
+  trading: {
+    w: 16, h: 11, floor: Tile.STONE, darkness: 0.25,
+    furniture: [
+      { x: 1, y: 2, sprite: 'bookshelf', w: 2, block: true }, { x: 13, y: 2, sprite: 'bookshelf', w: 2, block: true },
+      { x: 9, y: 2, sprite: 'window', w: 1 }, { x: 11, y: 2, sprite: 'window', w: 1 },
+      { x: 9, y: 6, sprite: 'desk', w: 3, block: true }, { x: 13, y: 7, sprite: 'globe', block: true },
+      { x: 1, y: 7, sprite: 'crate', block: true }, { x: 2, y: 7, sprite: 'crate', block: true }, { x: 1, y: 8, sprite: 'barrel', block: true },
+      { x: 6, y: 8, sprite: 'rug', w: 4, h: 2 },
+      candle(8, 2), candle(12, 5),
+    ],
+    counter: { x: 3, y: 4, w: 4, shop: 'auction', npc: 'livia' },
+  },
   fence: {
     w: 10, h: 8, floor: Tile.WOOD, darkness: 0.45,
     furniture: [

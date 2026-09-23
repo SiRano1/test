@@ -39,7 +39,7 @@ export interface GameApi {
   openShop(id: string): void;
   descend(): void;
   ascendToTown(): void;
-  bossDefeated(floor: number): void;
+  bossDefeated(floor: number, id?: string): void;
   setBoss(e: Actor | null): void;
   markRunLoot(uid: string): void;
   openCrafting(station: import('../data/recipes').Station): void;

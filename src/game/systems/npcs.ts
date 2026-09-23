@@ -39,6 +39,11 @@ export class NpcDirector {
 
   private placeNow(id: string): Place | null {
     const tm = this.state.time;
+    const rom = this.state.romance;
+    // супруг(а) живёт в усадьбе: утро и вечер дома, днём — прежние дела
+    if (rom.stage === 'married' && rom.partner === id && (tm.minutes < 9 * 60 || tm.minutes >= 19 * 60)) {
+      return { scene: 'manor', x: 9, y: 7, roam: 2, f: 0 };
+    }
     return placeFor(id, tm.minutes, (tm.day - 1) % 7, tm.weather);
   }
 
