@@ -422,6 +422,39 @@ add({
   drops: [['abyss_shard', 1, 3, 5], ['heartstone', 1, 3, 5]],
 });
 
+// ── Турнир рыцарей (Весна, 13): бойцы Стражи, сила подстраивается под героя ──
+add({
+  id: 'tourney_squire', name: L('Оруженосец Тобиас', 'Squire Tobias'), sprite: 'watch_squire', tier: 1,
+  hp: 60, atk: 7, def: 3, speed: 50, xp: 15, gold: [0, 0], hw: 5, hh: 4, poise: 0.2, mass: 1.2,
+  ai: 'melee', aggro: 14, threat: 0,
+  attacks: [
+    { id: 'slash', kind: 'arc', dmg: 1, range: 24, radius: 28, arc: 1, windup: 0.55, active: 0.12, recover: 0.5, cooldown: 0.5, weight: 3 },
+    { id: 'lunge', kind: 'lunge', dmg: 1.1, range: 70, minRange: 26, windup: 0.6, active: 0.3, recover: 0.7, cooldown: 3, lungeSpeed: 200, weight: 1 },
+  ],
+  drops: [],
+});
+add({
+  id: 'tourney_knight', name: L('Рыцарь Стражи', 'Knight of the Watch'), sprite: 'watch_knight', tier: 1,
+  hp: 90, atk: 8, def: 6, speed: 42, xp: 25, gold: [0, 0], hw: 6, hh: 4, poise: 0.5, mass: 2,
+  ai: 'melee', aggro: 14, threat: 0,
+  attacks: [
+    { id: 'cleave', kind: 'arc', dmg: 1.1, range: 28, radius: 32, arc: 1.1, windup: 0.65, active: 0.14, recover: 0.6, cooldown: 0.7, weight: 3 },
+    { id: 'charge', kind: 'lunge', dmg: 1.2, range: 90, minRange: 30, windup: 0.7, active: 0.35, recover: 0.8, cooldown: 3.5, lungeSpeed: 230, weight: 1 },
+  ],
+  drops: [],
+});
+add({
+  id: 'tourney_champion', name: L('Сэр Годрик, чемпион Стражи', 'Sir Godric, Champion of the Watch'), sprite: 'watch_champion', tier: 1,
+  hp: 260, atk: 10, def: 8, speed: 46, xp: 80, gold: [0, 0], hw: 7, hh: 5, poise: 0.8, mass: 3, elite: true,
+  ai: 'melee', aggro: 16, threat: 0, light: { r: 20, color: '#ffd080' },
+  attacks: [
+    { id: 'cleave', kind: 'arc', dmg: 1.1, range: 30, radius: 34, arc: 1.2, windup: 0.6, active: 0.14, recover: 0.55, cooldown: 0.6, weight: 3 },
+    { id: 'charge', kind: 'lunge', dmg: 1.3, range: 110, minRange: 30, windup: 0.65, active: 0.35, recover: 0.8, cooldown: 3, lungeSpeed: 260, weight: 2 },
+    { id: 'slam', kind: 'nova', dmg: 1.2, range: 36, radius: 44, windup: 0.9, active: 0.2, recover: 0.9, cooldown: 7, weight: 1 },
+  ],
+  drops: [],
+});
+
 add({
   id: 'gorm', name: L('Старшина Горм, Утопленник', 'Foreman Gorm, the Drowned'), sprite: 'gorm', tier: 2,
   hp: 850, atk: 16, def: 7, speed: 40, xp: 550, gold: [260, 360], hw: 9, hh: 6, poise: 1, mass: 7,

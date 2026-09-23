@@ -29,6 +29,8 @@ export interface NpcDef {
   gifts: { love: string[]; like: string[]; dislike: string[]; hate: string[] };
   look: Look;
   shop?: string;
+  /** Только говорит в сценах: нет в списке отношений, нельзя дарить. */
+  speakerOnly?: boolean;
 }
 
 const g = (love: string[], like: string[], dislike: string[] = [], hate: string[] = []) => ({ love, like, dislike, hate });
@@ -131,9 +133,13 @@ add({ id: 'hanna', name: L('Вдова Ханна', 'Widow Hanna'), role: L('Ф�
   look: { hair: '#8a6a4a', skin: '#e8b898', top: '#6a5a3a', bottom: '#4a4a3a', accent: '#c8c0a0', style: 'bun' } });
 
 // Не житель города: король под Троном (говорит в финале и сражается рядом в добром финале)
-add({ id: 'halvard', name: L('Хальвард', 'Halvard'), role: L('Король Эрдхейма', 'King of Erdheim'), romance: false, companion: 'sword', birthday: [0, 1],
+add({ id: 'halvard', name: L('Хальвард', 'Halvard'), role: L('Король Эрдхейма', 'King of Erdheim'), romance: false, companion: 'sword', birthday: [0, 1], speakerOnly: true,
   gifts: g([], []),
   look: { hair: '#c8c8d0', skin: '#c8b8b0', top: '#3a2a4a', bottom: '#241a30', accent: '#e0c060', style: 'short', beard: true } });
+
+add({ id: 'founder_spirit', name: L('Дух Основателя', 'Founder\u2019s Spirit'), role: L('Ночь духов', 'Night of Spirits'), romance: false, birthday: [2, 27], speakerOnly: true,
+  gifts: g([], []),
+  look: { hair: '#d8e8f0', skin: '#b8d0e0', top: '#8aa8c8', bottom: '#6a88a8', accent: '#e0f0ff', style: 'hood', robe: true } });
 
 /** Облик героя по умолчанию. */
 export const HERO_LOOK: Look = { hair: '#5a3a24', skin: '#f0c8a0', top: '#3a6a4a', bottom: '#4a3a2e', accent: '#c8a060', style: 'short' };

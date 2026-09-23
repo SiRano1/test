@@ -200,6 +200,7 @@ export function buildTown(game: GameApi): World {
   }
   for (const [bx, by] of [[13, 24], [4, 24], [21, 34], [44, 34], [59, 34]] as const)
     w.addNow(new Prop(bx * TILE + 8, by * TILE + 13, 'barrel', { block: true, hw: 5, hh: 3 }));
+  game.decorateTown?.(w);
 
   return w;
 }

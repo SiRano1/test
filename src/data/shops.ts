@@ -77,6 +77,11 @@ export const SHOPS: Record<string, ShopDef> = {
     stock: [{ item: 'oath_amulet' }, { item: 'silver_ribbon' }, { item: 'glass' }, { item: 'potion_big', deepest: 30 }, { item: 'steel_bar', deepest: 21 }, { item: 'silver_bar', deepest: 31 }],
     buys: (d) => tagged(d, 'gem', 'bar') || d.kind === 'accessory',
   },
+  fair: {
+    id: 'fair', npc: 'marta', name: L('Прилавок на ярмарке', 'Fair stall'), sellMul: 3,
+    stock: [{ item: 'apple' }, { item: 'honey_bread' }, { item: 'silver_ribbon' }],
+    buys: (d) => d.kind === 'food' || d.kind === 'consumable' || tagged(d, 'veg', 'crop'),
+  },
   fence: {
     id: 'fence', npc: 'lis', name: L('Лавка Лис', "Lis's Den"), sellMul: 0.8, rotating: true,
     stock: [{ item: 'torch_oil' }, { item: 'antidote' }],

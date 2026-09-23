@@ -24,6 +24,8 @@ export interface DialogueHost {
   take(def: string, n?: number): boolean;
   readLore(id: string): void;
   openAuction(): void;
+  festival(action: 'tourney' | 'contest' | 'rings' | 'giver' | 'dance'): void;
+  fest: import('./festivals').Festivals;
 }
 
 export interface DChoice {

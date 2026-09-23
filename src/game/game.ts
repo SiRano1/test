@@ -1,13 +1,14 @@
 import { EventBus } from '../core/events';
 import { Rng } from '../core/rng';
 import { CLASS_NAMES, itemDef } from '../data/items';
-import { setLang, t } from '../data/loc';
+import { setLang, t, type Loc } from '../data/loc';
 import { SHOPS } from '../data/shops';
 import { tr } from '../data/strings';
 import { isElevatorFloor, MAX_STORY_FLOOR } from '../data/tiers';
 import '../data/dialogue';
 import '../data/dialogue2';
 import '../data/dialogue3';
+import '../data/dialogue4';
 import { buildDungeon } from './dungeon/dungeonWorld';
 import type { Actor } from './entities/entity';
 import { Npc } from './entities/npc';
@@ -23,6 +24,8 @@ import { addToContainer, capacityFor, makeStack, sortContainer } from './systems
 import { itemName, makeItem } from './systems/loot';
 import { classLevel, computeStats, xpToNext, type Buff } from './systems/stats';
 import { learnTalent, resetTalents, talentPoints } from './systems/talents';
+import { Festivals } from './systems/festivals';
+import { festivalToday } from '../data/festivals';
 import { bedSpawn, buildInterior, infirmarySpawn, interiorEntry } from './town/interiors';
 import { buildTown, doorSpawn } from './town/town';
 import type { EquipSlot, ItemStack, Stats, WeaponClass } from './types';
@@ -82,13 +85,15 @@ export class Game implements GameApi, DialogueHost {
   private talkingNpc: Npc | null = null;
   readonly rng = new Rng((Date.now() ^ 0x2545f491) >>> 0);
   readonly npcs: NpcDirector;
+  readonly fest: Festivals;
   craftStation: Station | null = null;
   service: Service | null = null;
   private questT = 0;
 
   constructor(state: GameState) {
     this.state = state;
-    this.npcs = new NpcDirector(state);
+    this.fest = new Festivals(this);
+    this.npcs = new NpcDirector(state, (id) => this.fest.placeFor(id));
     if (!state.economy.rotating.length) dailyEconomy(state);
     setLang(state.settings.lang);
     const loc = state.location;
@@ -140,6 +145,7 @@ export class Game implements GameApi, DialogueHost {
 
     this.world.step(dt);
     this.npcs.update(this.world, dt);
+    this.fest.update(this.world, dt);
     this.tickTime(dt);
     this.tickBuffs(dt);
     this.syncHero();
@@ -220,6 +226,7 @@ export class Game implements GameApi, DialogueHost {
 
   private swapWorld(ref: SceneRef, spawn?: SpawnSpec): void {
     this.syncHero();
+    this.fest.onSceneChange();
     const prevKind = this.scene.kind;
     let world: World;
     let sp: SpawnSpec | undefined = spawn;
@@ -289,6 +296,10 @@ export class Game implements GameApi, DialogueHost {
   }
 
   openElevator(): void {
+    if (this.scene.kind === 'town' && this.fest.dungeonLocked()) {
+      this.toast(t(L('Сегодня праздник: Йорн откроет склеп только в 22:00', 'It is a festival: Yorn opens the crypt only at 22:00')), '#ffd080');
+      return;
+    }
     const stops = this.state.dungeon.elevator;
     if (this.scene.kind === 'town' && stops.length === 0) {
       this.world.fx({ t: 'sfx', id: 'door' });
@@ -446,6 +457,7 @@ export class Game implements GameApi, DialogueHost {
   // ───────────────────────── Смерть, сон, новый день ─────────────────────────
 
   onPlayerDeath(): void {
+    if (this.fest.onPlayerDown()) return;
     // компаньон с 8+ ♥ один раз за день поднимает героя
     const comp = this.world.entities.find((e): e is Companion => e instanceof Companion && !e.dead && e.canRevive);
     if (comp && this.state.companion && !this.state.companion.revived) {
@@ -551,6 +563,8 @@ export class Game implements GameApi, DialogueHost {
     this.cachedStats = null;
     const tm = this.state.time;
     this.events.emit('dayStart', { text: tr('newDay', { season: seasonName(tm.season), day: tm.day }) });
+    const fest = festivalToday(this.state);
+    if (fest) setTimeout(() => this.toast(`${t(L('Сегодня', 'Today'))}: ${t(fest.name)}! ${t(fest.desc)}`, '#ffd080'), 2200);
     this.state.location = { scene: { kind: 'interior', id: 'manor' }, ...bedSpawn() };
     this.events.emit('autosave', undefined);
   }
@@ -587,9 +601,37 @@ export class Game implements GameApi, DialogueHost {
   }
 
   dialogueChoose(i: number): void {
-    if (!this.dialogue) return;
-    if (!this.dialogue.choose(i)) this.endDialogue();
+    const d = this.dialogue;
+    if (!d) return;
+    // выбор мог открыть новый разговор (say) — тогда старый не закрываем поверх нового
+    if (!d.choose(i) && this.dialogue === d) this.endDialogue();
     else this.events.emit('dialogue', undefined);
+  }
+
+  /** Короткая сцена: несколько реплик жителя без выбора. */
+  say(npc: string, pages: Loc[], onEnd?: () => void): void {
+    this.dialogue = new DialogueRunner(this, npc, { id: 'say', npc, priority: 0, pages, onEnd: onEnd ? () => onEnd() : undefined });
+    this.mode = 'dialogue';
+    this.events.emit('dialogue', undefined);
+  }
+
+  addBuff(stat: keyof Stats, value: number, seconds: number): void {
+    this.buffs = this.buffs.filter((b) => b.stat !== stat);
+    this.buffs.push({ stat, value, t: seconds });
+    this.refreshStats();
+  }
+
+  /** Праздничные действия из диалогов. */
+  festival(action: 'tourney' | 'contest' | 'rings' | 'giver' | 'dance'): void {
+    const f = this.fest;
+    if (action === 'tourney') f.startTourney();
+    else if (action === 'contest') f.harvestContest();
+    else if (action === 'rings') f.ringToss();
+    else if (action === 'dance') f.dance();
+    else {
+      const target = f.secretGiver();
+      if (target) this.say('ogden', [L(`Ваш адресат — ${npcDef(target).name.ru}. Подарок ему или ей сегодня будет стоить втрое!`, `Your recipient is ${npcDef(target).name.en}. A gift to them today counts triple!`)]);
+    }
   }
 
   private endDialogue(): void {
@@ -651,6 +693,10 @@ export class Game implements GameApi, DialogueHost {
   // ───────────────────────── Магазины ─────────────────────────
 
   openShop(id: string): void {
+    if (this.fest.shopClosed(id)) {
+      this.toast(t(L('Сегодня праздник — лавка закрыта', 'It is a festival — the shop is closed')), '#ffd080');
+      return;
+    }
     this.shopId = id;
     if (this.mode !== 'dialogue') {
       this.mode = 'shop';
@@ -1232,7 +1278,7 @@ export class Game implements GameApi, DialogueHost {
     const bday = isBirthday(this.state, def);
     const ns = npcState(this.state, npc);
     const before = hearts(this.state, npc);
-    ns.points = Math.max(0, Math.min(10 * 250 + 249, ns.points + GIFT_POINTS[reaction] * (bday ? 8 : 1)));
+    ns.points = Math.max(0, Math.min(10 * 250 + 249, ns.points + GIFT_POINTS[reaction] * (bday ? 8 : 1) * this.fest.giftMul(npc)));
     ns.giftedToday = true;
     ns.giftsWeek++;
     (this.state.giftLog[npc] ??= {})[s.def] = reaction;
@@ -1250,6 +1296,10 @@ export class Game implements GameApi, DialogueHost {
   }
 
   // ───────────────────────── Сад ─────────────────────────
+
+  decorateTown(w: World): void {
+    this.fest.decorate(w);
+  }
 
   plotLabel(i: number): string {
     const p = this.state.manor.garden[i];

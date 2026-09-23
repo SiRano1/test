@@ -35,10 +35,12 @@ export class NpcDirector {
   private where = new Map<string, string>();
   private tick = 0;
 
-  constructor(private state: GameState) {}
+  constructor(private state: GameState, private override?: (id: string) => Place | null) {}
 
   private placeNow(id: string): Place | null {
     const tm = this.state.time;
+    const fest = this.override?.(id);
+    if (fest) return fest;
     const rom = this.state.romance;
     // супруг(а) живёт в усадьбе: утро и вечер дома, днём — прежние дела
     if (rom.stage === 'married' && rom.partner === id && (tm.minutes < 9 * 60 || tm.minutes >= 19 * 60)) {

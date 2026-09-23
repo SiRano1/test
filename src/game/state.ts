@@ -73,6 +73,8 @@ export interface GameState {
   romance: { partner: string | null; stage: 'dating' | 'engaged' | 'married' | null; weddingDay: number };
   /** Очки навыков, вложенные в деревья: id узла → true. */
   talents: string[];
+  /** Текущий праздник: что уже сделано, чей шёпот услышан, адресат тайного дарителя. */
+  fest: { key: string; target: string | null; heard: string[]; done: string[] };
   /** Где герой находится (для загрузки). Подземелье не сохраняется — загрузка у склепа. */
   location: { scene: SceneRef; x: number; y: number };
   playtime: number;
@@ -136,6 +138,7 @@ export function newGameState(name: string, seed: number): GameState {
     ending: null,
     romance: { partner: null, stage: null, weddingDay: 0 },
     talents: [],
+    fest: { key: '', target: null, heard: [], done: [] },
     location: { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 },
     playtime: 0,
     settings: { lang: 'ru', volume: 0.6, shake: true },

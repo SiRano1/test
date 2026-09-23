@@ -242,6 +242,14 @@ export const LORE: LoreDef[] = [
   },
   // ── Особые записи (не из подземелья) ──
   {
+    id: 'spirits_night', floor: -1, kind: 'note',
+    title: L('Ночь духов: шёпот Основателей', 'Night of Spirits: the Founders\u2019 whispers'),
+    text: L(
+      'Четверо, что запечатали короля, говорили со мной у фонарей.\n\nЭдмунд велел прочесть его письмо. Альдрик — отдать летопись крови Элиссы. Ровена напомнила, что Стража помнит клятву. Тейн предупредил: ключ эстафеты — приговор тому, кто его вложит.\n\nОни не просили прощения. Только — не повторять.',
+      'The Four who sealed the King spoke to me by the lanterns.\n\nEdmund bade me read his letter. Aldric — give the chronicle to Elissa\u2019s blood. Rowena reminded me the Watch remembers its oath. Thane warned: the relay key is a sentence for whoever sets it.\n\nThey did not ask forgiveness. Only — not to repeat it.',
+    ),
+  },
+  {
     id: 'edmund_letter', floor: 0, kind: 'note',
     title: L('Письмо Эдмунда Холлоуэя', "Edmund Holloway's Letter"),
     text: L(

@@ -334,7 +334,7 @@ export class Ui {
       this.dialogueEl.append(list);
     } else if (done) this.dialogueEl.append(h('div', { class: 'more' }, '▼'));
     const extra = h('div', { style: 'position:absolute;right:16px;top:-9px;display:flex;gap:2px' });
-    if (done && d.line.id !== 'gift' && !d.line.id.startsWith('thanks') && d.npc !== 'halvard') {
+    if (done && d.line.id !== 'gift' && d.line.id !== 'say' && !d.line.id.startsWith('thanks') && !NPCS[d.npc]?.speakerOnly) {
       if (g.canGift(d.npc)) extra.append(h('button', { style: 'font-size:7px', onclick: () => this.openGiftPicker() }, `🎁 ${tr('gift')}`));
       if (g.canInvite(d.npc)) extra.append(h('button', { style: 'font-size:7px', onclick: () => { g.inviteCompanion(d.npc); this.renderDialogue(); } }, `⚔ ${tr('invite')}`));
     }
@@ -617,7 +617,7 @@ export class Ui {
         h('span', { style: 'color:var(--ink-dim);font-size:6px' }, t(f.perk))));
     }
     col.append(h('h2', { style: 'margin-top:4px' }, tr('relations')));
-    const met = Object.keys(NPCS).filter((id) => id !== 'halvard' && (s.flags[`dlg:${id}_meet`] || s.npcs[id]));
+    const met = Object.keys(NPCS).filter((id) => !NPCS[id]!.speakerOnly && (s.flags[`dlg:${id}_meet`] || s.npcs[id]));
     if (!met.length) col.append(h('div', { class: 'help' }, t(L('Вы ещё ни с кем не знакомы.', "You haven't met anyone yet."))));
     for (const id of met) {
       const n = NPCS[id]!;

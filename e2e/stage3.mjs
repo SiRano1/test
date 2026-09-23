@@ -75,6 +75,34 @@ try {
     await wait(1400);
     await shot('03-trap');
   }
+  const fest = async (name, season, day, minutes, spawn, extra) => {
+    await ev(({ season, day, minutes, spawn }) => {
+      const { game: g } = window.__dtc;
+      g.state.time.season = season;
+      g.state.time.day = day;
+      g.state.time.minutes = minutes;
+      g.state.time.weather = season === 3 ? 'snow' : 'sunny';
+      g.goTo({ kind: 'town' }, { x: spawn[0] * 16 + 8, y: spawn[1] * 16 + 8, facing: 3 });
+    }, { season, day, minutes, spawn });
+    await wait(2500);
+    if (extra) {
+      await ev(extra);
+      await wait(extra.wait ?? 1500);
+    }
+    await shot(name);
+  };
+  if (want('fest')) {
+    const tourney = () => {
+      const { game: g } = window.__dtc;
+      g.state.hero.level = 6;
+      g.festival('tourney');
+    };
+    tourney.wait = 3800;
+    await fest('04-tourney', 0, 13, 11 * 60, [31, 20], tourney);
+    await fest('05-fair', 1, 11, 12 * 60, [31, 21]);
+    await fest('06-spirits', 2, 27, 21 * 60, [11, 15]);
+    await fest('07-feast', 3, 25, 19 * 60, [31, 19]);
+  }
 } finally {
   console.log(errors.length ? `ERRORS:\n${errors.join('\n')}` : 'no page errors');
   await browser.close();

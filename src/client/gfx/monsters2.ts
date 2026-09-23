@@ -40,8 +40,25 @@ function winged(frame: number, body: string, wing: string, glow: string, w = 22,
   return g;
 }
 
+/** Турнирный меч и щит поверх фигуры. */
+function tourneyGear(g: Grid, frame: number, shield: string): Grid {
+  const ox = Math.floor((g.w - 16) / 2), oy = g.h - 20;
+  const bob = frame === 1 ? 1 : 0;
+  g.line(ox + 15, oy + 6 + bob, ox + 15, oy + 15 + bob, '#d8dce8').rect(ox + 14, oy + 14 + bob, 3, 1, '#8a6a3a');
+  g.rect(ox, oy + 10, 4, 6, shield).rect(ox + 1, oy + 11, 2, 4, shade(shield, 0.25)).set(ox + 1, oy + 12, '#f0e0a0');
+  return g;
+}
+
 export function extraMonsterFrames(sprite: string): Grid[] | null {
   switch (sprite) {
+    case 'watch_squire': {
+      const look: Look = { hair: '#8a5a30', skin: '#e0b894', top: '#8a3a30', bottom: '#4a3a30', accent: '#c8a040', style: 'cap' };
+      return [0, 1, 2].map((f) => tourneyGear(humanoid(look, 'down', f as 0 | 1 | 2), f, '#8a5a33'));
+    }
+    case 'watch_knight':
+      return [0, 1, 2].map((f) => tourneyGear(armored(f, '#9aa0ac', '#c83a3a', '#1a1216'), f, '#a83a30').outline(OUT));
+    case 'watch_champion':
+      return [0, 1, 2].map((f) => tourneyGear(armored(f, '#c8ccd8', '#e0b040', '#1a1216', 18, 22, true), f, '#3a5aa8').outline(OUT));
     case 'sporeling':
       return [0, 1].map((f) => {
         const g = new Grid(16, 18);

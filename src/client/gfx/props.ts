@@ -67,6 +67,18 @@ export function propArt(key: string, season: number): Art | null {
       return art([brazierCold()], 6, 15);
     case 'chest_sealed':
       return sealedChest();
+    case 'banner':
+      return art([0, 1].map((f) => banner(a!, f)), 6, 30, 3);
+    case 'pumpkins':
+      return art([pumpkins()], 8, 13);
+    case 'lantern':
+      return art([0, 1].map((f) => lanternPost(f)), 4, 22, 4);
+    case 'feast_table':
+      return art([feastTable()], 72, 18);
+    case 'fir':
+      return art([0, 1].map((f) => fir(f)), 10, 30, 2);
+    case 'spirit':
+      return art([0, 1, 2, 3].map((f) => spirit(f)), 8, 22, 5);
     case 'decor':
       return decor(a!);
     case 'well':
@@ -311,6 +323,74 @@ function sealedChest(): Art {
   ctx.fillStyle = '#c07bff';
   ctx.fillRect(7, 7, 2, 2);
   return { frames: [cv], ax: 8, ay: 14 };
+}
+
+// ─────────────────────────── Праздники ───────────────────────────
+
+function banner(c: string, f: number): Grid {
+  const g = new Grid(12, 31);
+  g.rect(5, 2, 2, 29, WOOD).rect(5, 2, 1, 29, WOOD_L).rect(4, 0, 4, 2, '#c8a040');
+  const sway = f;
+  g.rect(6, 4, 5, 14, c).rect(6, 4, 5, 1, shade(c, 0.3)).rect(6, 17, 5, 1, shade(c, -0.3));
+  g.set(7 + sway, 18, c).set(9, 18 + sway, c).rect(7, 8, 3, 4, '#f0e0a0').set(8, 9, c);
+  return g.outline(OUT);
+}
+
+function pumpkins(): Grid {
+  const g = new Grid(16, 14);
+  const o = '#e07a20', oS = '#a84a10', oL = '#ffa850';
+  g.ellipse(1, 5, 9, 8, o).ellipse(7, 7, 8, 7, shade(o, -0.08)).rect(3, 6, 1, 6, oS).rect(10, 8, 1, 5, oS);
+  g.set(3, 7, oL).set(9, 9, oL).rect(5, 3, 1, 2, '#5a7a2a').rect(11, 5, 1, 2, '#5a7a2a');
+  // вырезанное лицо
+  g.set(4, 8, '#ffd040').set(7, 8, '#ffd040').rect(4, 10, 4, 1, '#ffd040');
+  return g.outline(OUT);
+}
+
+function lanternPost(f: number): Grid {
+  const g = new Grid(8, 23);
+  g.rect(3, 6, 2, 17, '#3a3036').rect(1, 5, 6, 1, '#3a3036');
+  g.rect(1, 6, 1, 2, '#3a3036').rect(0, 8, 3, 4, '#2a2228').rect(0, 9, 3, 2, f ? '#d8f0ff' : '#a8d8ff');
+  g.rect(5, 8, 3, 4, '#2a2228').rect(5, 9, 3, 2, f ? '#a8d8ff' : '#d8f0ff');
+  return g.outline(OUT);
+}
+
+function feastTable(): Grid {
+  const W = 144;
+  const g = new Grid(W, 20);
+  g.rect(1, 6, W - 2, 8, '#c8b89a').rect(1, 6, W - 2, 1, '#e8dcc0').rect(1, 13, W - 2, 1, '#a89878');
+  g.rect(1, 14, W - 2, 3, WOOD).rect(4, 17, 2, 3, WOOD_S).rect(W - 6, 17, 2, 3, WOOD_S).rect(W / 2 - 1, 17, 2, 3, WOOD_S);
+  const foods = ['#a85a2a', '#e0c060', '#c83a3a', '#6a8a3a', '#e07a20', '#d8a070'];
+  for (let x = 6, i = 0; x < W - 10; x += 12, i++) {
+    g.ellipse(x, 7, 8, 5, '#e8e8f0').ellipse(x + 1, 7, 6, 3, foods[i % foods.length]!);
+    if (i % 3 === 1) g.rect(x + 9, 3, 2, 5, '#f0e8d0').set(x + 9, 2, '#ffd040').set(x + 10, 1, '#ffa030');
+    if (i % 4 === 2) g.rect(x + 8, 7, 3, 4, '#8a3a4a').rect(x + 8, 7, 3, 1, '#c8a040');
+  }
+  return g.outline(OUT);
+}
+
+function fir(f: number): Grid {
+  const g = new Grid(20, 31);
+  const gr = '#2a5a3a', grL = '#3a7a4a';
+  g.rect(9, 26, 2, 5, WOOD_S);
+  for (let i = 0; i < 4; i++) {
+    const y = 4 + i * 6, w = 6 + i * 4;
+    g.rect(10 - w / 2, y, w, 7, gr).rect(10 - w / 2 + 1, y, w - 2, 1, grL);
+  }
+  g.rect(9, 1, 2, 3, '#ffd040').set(8, 2, '#ffd040').set(11, 2, '#ffd040');
+  const bulbs = ['#ff5050', '#50a0ff', '#ffd040', '#ff90d0'];
+  const pts = [[7, 8], [12, 11], [6, 15], [13, 17], [9, 20], [4, 23], [15, 24], [10, 13]];
+  pts.forEach(([x, y], i) => g.set(x!, y!, bulbs[(i + f) % bulbs.length]!));
+  return g.outline(OUT);
+}
+
+function spirit(f: number): Grid {
+  const g = new Grid(16, 23);
+  const bob = [0, 1, 2, 1][f]!;
+  const c = 'rgba(200,232,255,0.75)', cS = 'rgba(138,168,200,0.7)', eye = '#ffffff';
+  g.ellipse(4, 2 + bob, 8, 8, c).rect(4, 7 + bob, 8, 10, c).rect(3, 10 + bob, 1, 5, cS).rect(12, 10 + bob, 1, 5, cS);
+  for (let x = 4; x < 12; x += 2) g.rect(x, 17 + bob, 1, 2 + ((x + f) % 3), c);
+  g.rect(5, 3 + bob, 6, 2, cS).set(6, 6 + bob, eye).set(9, 6 + bob, eye);
+  return g;
 }
 
 function cracks(): Grid {

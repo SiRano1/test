@@ -47,6 +47,8 @@ export interface GameApi {
   counter(npc: string): void;
   plotAction(index: number): void;
   plotLabel(index: number): string;
+  /** Праздничные украшения города. */
+  decorateTown?(w: World): void;
 }
 
 /** Интерфейс ломаемых объектов (урны, жилы, треснувшие стены). */

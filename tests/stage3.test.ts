@@ -9,6 +9,12 @@ import { TALENTS } from '../src/data/talents';
 import { endingConditions } from '../src/data/endings';
 import { npcState } from '../src/game/state';
 import { Enemy } from '../src/game/entities/enemy';
+import { Npc } from '../src/game/entities/npc';
+import { SpiritProp } from '../src/game/systems/festivals';
+import { sellPrice } from '../src/game/systems/economy';
+import { SHOPS } from '../src/data/shops';
+import { GIFT_POINTS, giftReaction } from '../src/game/systems/relations';
+import { npcDef } from '../src/data/npcs';
 import type { Hitbox } from '../src/game/combat/combat';
 import { BrazierPuzzle, DartTrap, FireGrate, PlatePuzzle, PressurePlate, PuzzleBrazier, RuneTrap, SealedChest, SpikeTrap } from '../src/game/entities/traps';
 
@@ -247,5 +253,96 @@ describe('Ловушки и головоломки', () => {
     }
     expect(traps).toBeGreaterThan(20);
     expect(puzzles).toBeGreaterThan(2);
+  });
+});
+
+describe('Праздники', () => {
+  const festDay = (g: Game, season: number, day: number, minutes: number) => {
+    g.state.time.season = season;
+    g.state.time.day = day;
+    g.state.time.minutes = minutes;
+    g.goTo({ kind: 'town' });
+    run(g, 1.5);
+  };
+  const npcIds = (g: Game) => g.world.entities.filter((e): e is Npc => e instanceof Npc).map((n) => n.def.id);
+
+  it('в день турнира горожане на площади, лавки и склеп закрыты', () => {
+    const g = Game.newGame('T', 71);
+    festDay(g, 0, 13, 11 * 60);
+    const ids = npcIds(g);
+    expect(ids).toContain('bran');
+    expect(ids.length).toBeGreaterThan(15);
+    g.openShop('smith');
+    expect(g.mode).toBe('play');
+    g.openElevator();
+    expect(g.mode).toBe('play');
+    expect(g.scene.kind).toBe('town');
+  });
+
+  it('турнир: три раунда и приз', () => {
+    const g = Game.newGame('T', 72);
+    festDay(g, 0, 13, 11 * 60);
+    const gold0 = g.state.hero.gold;
+    g.festival('tourney');
+    for (let round = 0; round < 3; round++) {
+      run(g, 3);
+      const foes = g.fest.duel?.foes ?? [];
+      expect(foes.length).toBeGreaterThan(0);
+      for (const f of foes) f.die(g.world);
+      run(g, 0.2);
+    }
+    expect(g.fest.duel).toBeNull();
+    expect(g.state.hero.gold).toBeGreaterThanOrEqual(gold0 + 300);
+    expect(g.state.flags.tourney_won_1).toBe(true);
+    expect(g.state.inventory.some((s) => s && s.rarity === 2)).toBe(true);
+  });
+
+  it('поражение на турнире — не смерть', () => {
+    const g = Game.newGame('T', 73);
+    festDay(g, 0, 13, 11 * 60);
+    g.festival('tourney');
+    run(g, 3);
+    g.player.die(g.world);
+    expect(g.player.dead).toBe(false);
+    expect(g.mode).not.toBe('dead');
+    expect(g.fest.duel).toBeNull();
+  });
+
+  it('ярмарка: конкурс урожая и тройная цена', () => {
+    const g = Game.newGame('T', 74);
+    festDay(g, 1, 11, 12 * 60);
+    g.give('pumpkin', 2);
+    const gold0 = g.state.hero.gold;
+    g.festival('contest');
+    expect(g.state.hero.gold).toBeGreaterThan(gold0);
+    expect(g.fest.did('contest')).toBe(true);
+    const pumpkin = g.state.inventory.find((s) => s?.def === 'pumpkin')!;
+    expect(sellPrice(g.state, pumpkin, SHOPS.fair!)).toBeGreaterThan(sellPrice(g.state, pumpkin, SHOPS.grocer!) * 2);
+  });
+
+  it('Ночь духов: четыре шёпота дают запись и фонарь', () => {
+    const g = Game.newGame('T', 75);
+    festDay(g, 2, 27, 20 * 60);
+    const spirits = g.world.entities.filter((e): e is SpiritProp => e instanceof SpiritProp);
+    expect(spirits).toHaveLength(4);
+    for (const sp of spirits) {
+      sp.interaction!.act(g.world);
+      while (g.dialogue) g.dialogueAdvance();
+    }
+    expect(g.state.lore).toContain('spirits_night');
+    expect(g.state.inventory.some((s) => s?.def === 'spirit_lantern')).toBe(true);
+  });
+
+  it('Зимний пир: тайный даритель утраивает подарок', () => {
+    const g = Game.newGame('T', 76);
+    festDay(g, 3, 25, 17 * 60);
+    g.festival('giver');
+    const target = g.state.fest.target!;
+    expect(target).toBeTruthy();
+    g.give('apple', 1);
+    const p0 = npcState(g.state, target).points;
+    g.giveGift(target, g.state.inventory.findIndex((s) => s?.def === 'apple'));
+    const gained = npcState(g.state, target).points - p0;
+    expect(gained).toBe(GIFT_POINTS[giftReaction(npcDef(target), 'apple')] * 3);
   });
 });
