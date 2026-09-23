@@ -42,7 +42,7 @@ const INTERIORS: Record<string, InteriorSpec> = {
       { x: 13, y: 8, sprite: 'crate', w: 1, h: 1, block: true },
       { x: 14, y: 8, sprite: 'cobweb', w: 1, h: 1 },
       { x: 1, y: 9, sprite: 'cobweb', w: 1, h: 1 },
-      { x: 7, y: 5, sprite: 'candle_stand', w: 1, h: 1, block: true, light: { r: 36, color: '#ffd080', flicker: 0.1 } },
+      { x: 4, y: 2, sprite: 'candle_stand', w: 1, h: 1, block: true, light: { r: 36, color: '#ffd080', flicker: 0.1 } },
     ],
     npcs: [], bed: { x: 2, y: 3 },
   },

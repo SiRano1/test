@@ -73,8 +73,8 @@ export function townDarkness(minutes: number): number {
   const h = minutes / 60;
   if (h < 17) return 0;
   if (h < 19) return ((h - 17) / 2) * 0.3;
-  if (h < 21) return 0.3 + ((h - 19) / 2) * 0.32;
-  return 0.62;
+  if (h < 21) return 0.3 + ((h - 19) / 2) * 0.42;
+  return 0.72;
 }
 
 /** Оттенок неба (для закатного света). */

@@ -75,7 +75,7 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   for (const [tx, ty] of layout.cracked) w.addNow(new CrackedWall(tx, ty));
 
   // монстры по бюджету угрозы
-  const budget = 8 + floor * 1.6 + (floor % 10) * 0.4;
+  const budget = 6 + floor * 1.3 + (floor % 10) * 0.4;
   const fightRooms = layout.rooms.filter((r) => r.role !== 'start' && r.role !== 'secret');
   const area = fightRooms.reduce((n, r) => n + r.w * r.h, 0);
   for (const r of fightRooms) {
@@ -95,7 +95,7 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
     }
   }
   // элита
-  if (floor >= 3 && tier.elites.length && rng.chance(0.2 + (floor % 10) * 0.05)) {
+  if (floor % 10 >= 4 && tier.elites.length && rng.chance(0.15 + (floor % 10) * 0.05)) {
     const deep = fightRooms.filter((x) => x.depth >= 12);
     const r = rng.pick(deep.length ? deep : fightRooms);
     const pos = randomTile(rng, r, free);

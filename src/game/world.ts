@@ -5,7 +5,7 @@ import type { TileMap } from '../core/tilemap';
 import type { TierDef } from '../data/tiers';
 import { hitboxTouches, resolveHit, type Hitbox, type HitSpec } from './combat/combat';
 import { Pickup } from './entities/pickup';
-import type { Actor, Entity } from './entities/entity';
+import { Actor, type Entity } from './entities/entity';
 import type { GameEvents, Fx } from './events';
 import type { GameState, SceneRef } from './state';
 import type { ItemStack, Stats, WeaponClass } from './types';
@@ -118,11 +118,11 @@ export class World {
   }
 
   actors(): Actor[] {
-    return this.entities.filter((e): e is Actor => 'hp' in e && !(e as Actor).dead);
+    return this.entities.filter((e): e is Actor => e instanceof Actor && !e.dead);
   }
 
   enemies(): Actor[] {
-    return this.entities.filter((e): e is Actor => 'team' in e && (e as Actor).team === 'enemy' && !(e as Actor).dead);
+    return this.entities.filter((e): e is Actor => e instanceof Actor && e.team === 'enemy' && !e.dead);
   }
 
   /** Расход стамины на блок: у игрока — реальная стамина, у монстров — всегда хватает. */

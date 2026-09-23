@@ -54,7 +54,8 @@ export class Enemy extends Actor {
     super();
     this.def = monsterDef(id);
     const d = this.def;
-    const sc = floorScale(floor, d.tier);
+    // у боссов характеристики подобраны вручную — без масштабирования по этажу
+    const sc = d.boss ? 1 : floorScale(floor, d.tier);
     this.x = this.homeX = x;
     this.y = this.homeY = y;
     this.team = 'enemy';
@@ -283,7 +284,8 @@ export class Enemy extends Actor {
             sx = this.x;
             sy = this.y;
           }
-          const m = new Enemy(s.id, sx, sy, this.floor);
+          // приспешники босса — с базовыми характеристиками яруса, иначе бой превращается в свалку
+          const m = new Enemy(s.id, sx, sy, this.def.boss ? (this.def.tier - 1) * 10 + 3 : this.floor);
           m.minion = true;
           m.state = 'chase';
           this.summoned.push(w.add(m));

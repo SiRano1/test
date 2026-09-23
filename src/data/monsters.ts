@@ -77,7 +77,7 @@ export function monsterDef(id: string): MonsterDef {
 
 add({
   id: 'skeleton', name: L('Скелет', 'Skeleton'), sprite: 'skeleton', tier: 1,
-  hp: 34, atk: 9, def: 2, speed: 40, xp: 8, gold: [1, 4], hw: 5, hh: 3, poise: 0, mass: 1,
+  hp: 26, atk: 7, def: 2, speed: 40, xp: 8, gold: [1, 4], hw: 5, hh: 3, poise: 0, mass: 1,
   ai: 'melee', aggro: 7, undead: true, threat: 2,
   attacks: [{ id: 'slash', kind: 'arc', dmg: 1, range: 20, radius: 22, arc: 1.1, windup: 0.5, active: 0.12, recover: 0.55, cooldown: 0.6 }],
   drops: [['bone', 0.45, 1, 2], ['rag', 0.15, 1, 1], ['potion_small', 0.03, 1, 1]],
@@ -85,7 +85,7 @@ add({
 
 add({
   id: 'skeleton_archer', name: L('Скелет-лучник', 'Skeleton Archer'), sprite: 'skeleton_archer', tier: 1,
-  hp: 24, atk: 8, def: 1, speed: 36, xp: 10, gold: [2, 5], hw: 5, hh: 3, poise: 0, mass: 0.9,
+  hp: 20, atk: 6, def: 1, speed: 36, xp: 10, gold: [2, 5], hw: 5, hh: 3, poise: 0, mass: 0.9,
   ai: 'ranged', aggro: 9, keepDistance: 72, undead: true, threat: 3,
   attacks: [{ id: 'shoot', kind: 'projectile', dmg: 1, range: 150, windup: 0.7, active: 0.05, recover: 0.6, cooldown: 1.4, projSpeed: 150, projSprite: 'arrow' }],
   drops: [['bone', 0.4, 1, 2], ['wood', 0.2, 1, 2]],
@@ -93,7 +93,7 @@ add({
 
 add({
   id: 'grave_rat', name: L('Могильная крыса', 'Grave Rat'), sprite: 'rat', tier: 1,
-  hp: 14, atk: 5, def: 0, speed: 62, xp: 4, gold: [0, 2], hw: 4, hh: 3, poise: 0, mass: 0.7,
+  hp: 12, atk: 4, def: 0, speed: 62, xp: 4, gold: [0, 2], hw: 4, hh: 3, poise: 0, mass: 0.7,
   ai: 'melee', aggro: 6, threat: 1,
   attacks: [{ id: 'bite', kind: 'lunge', dmg: 1, range: 34, windup: 0.35, active: 0.22, recover: 0.5, cooldown: 0.5, lungeSpeed: 170, status: { id: 'poison', chance: 0.15, duration: 4 } }],
   drops: [['grave_moss', 0.2, 1, 1]],
@@ -101,7 +101,7 @@ add({
 
 add({
   id: 'bat', name: L('Нетопырь', 'Bat'), sprite: 'bat', tier: 1,
-  hp: 10, atk: 5, def: 0, speed: 58, xp: 4, gold: [0, 2], hw: 4, hh: 3, poise: 0, mass: 0.6, flyer: true,
+  hp: 10, atk: 4, def: 0, speed: 58, xp: 4, gold: [0, 2], hw: 4, hh: 3, poise: 0, mass: 0.6, flyer: true,
   ai: 'flyer', aggro: 8, threat: 1,
   attacks: [{ id: 'swoop', kind: 'lunge', dmg: 1, range: 46, windup: 0.4, active: 0.28, recover: 0.6, cooldown: 0.8, lungeSpeed: 190 }],
   drops: [['bat_wing', 0.35, 1, 1]],
@@ -109,7 +109,7 @@ add({
 
 add({
   id: 'bone_knight', name: L('Костяной рыцарь', 'Bone Knight'), sprite: 'bone_knight', tier: 1,
-  hp: 120, atk: 14, def: 6, speed: 34, xp: 32, gold: [10, 25], hw: 6, hh: 4, poise: 0.8, mass: 2.2,
+  hp: 90, atk: 9, def: 5, speed: 34, xp: 32, gold: [10, 25], hw: 6, hh: 4, poise: 0.8, mass: 2.2,
   ai: 'melee', aggro: 8, undead: true, elite: true, threat: 6,
   attacks: [
     { id: 'cleave', kind: 'arc', dmg: 1.2, range: 24, radius: 28, arc: 1.4, windup: 0.75, active: 0.15, recover: 0.7, cooldown: 0.8, weight: 3 },
@@ -120,7 +120,7 @@ add({
 
 add({
   id: 'bone_abbot', name: L('Костяной Настоятель', 'The Bone Abbot'), sprite: 'bone_abbot', tier: 1,
-  hp: 650, atk: 15, def: 5, speed: 38, xp: 300, gold: [150, 220], hw: 8, hh: 5, poise: 1, mass: 6,
+  hp: 520, atk: 15, def: 5, speed: 38, xp: 300, gold: [150, 220], hw: 8, hh: 5, poise: 1, mass: 6,
   ai: 'boss', aggro: 20, undead: true, boss: true, threat: 0,
   light: { r: 40, color: '#8fd0ff' },
   attacks: [

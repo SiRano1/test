@@ -77,6 +77,7 @@ export class Game implements GameApi, DialogueHost {
     s.equipment.body = makeItem(g0, 'leather_body');
     give('potion_small', 3);
     give('bread', 3);
+    s.hero.hp = Math.round(computeStats(s).maxHp);
     return new Game(s);
   }
 
@@ -148,6 +149,19 @@ export class Game implements GameApi, DialogueHost {
   goTo(ref: SceneRef, spawn?: SpawnSpec, after?: () => void): void {
     if (this.transition) return;
     this.transition = { t: 0, dur: 0.55, ref, spawn, swapped: false, after };
+    // закрыть всё, что было открыто в старой сцене
+    if (this.dialogue) {
+      this.dialogue = null;
+      if (this.talkingNpc) this.talkingNpc.talking = false;
+      this.talkingNpc = null;
+      this.events.emit('dialogue', undefined);
+    }
+    if (this.shopId) this.closeShop();
+    if (this.loreOpen) this.closeLore();
+    if (this.elevatorStops) {
+      this.elevatorStops = null;
+      this.events.emit('elevator', null);
+    }
     this.mode = 'play';
   }
 

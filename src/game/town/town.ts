@@ -142,7 +142,7 @@ export function buildTown(game: GameApi): World {
   // уличные фонари вдоль дорог
   for (const [lx, ly] of [[29, 14], [33, 14], [29, 25], [33, 25], [20, 25], [42, 25], [8, 28], [55, 28], [29, 33], [33, 33], [20, 33], [44, 33]] as const) {
     const lp = new Prop(lx * TILE + 8, ly * TILE + 14, 'lamppost', { block: true, hw: 2, hh: 2 });
-    lp.light = { r: 56, color: '#ffc870', power: 1, flicker: 0.06 };
+    lp.light = { r: 46, color: '#ffc870', power: 0.9, flicker: 0.06 };
     (lp as any).nightOnly = true;
     w.addNow(lp);
   }

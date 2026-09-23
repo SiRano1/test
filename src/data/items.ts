@@ -134,7 +134,7 @@ export interface MaterialTier {
 }
 
 export const METALS: MaterialTier[] = [
-  { id: 'rusty', tier: 0, adj: adj('Ржав', 'ый', 'ая', 'ое', 'ые', 'Rusty'), c1: '#9a6a4a', c2: '#5a3a2a', mult: 0.7 },
+  { id: 'rusty', tier: 0, adj: adj('Ржав', 'ый', 'ая', 'ое', 'ые', 'Rusty'), c1: '#9a6a4a', c2: '#5a3a2a', mult: 0.85 },
   { id: 'copper', tier: 1, adj: adj('Медн', 'ый', 'ая', 'ое', 'ые', 'Copper'), c1: '#e08a4a', c2: '#8a4a2a', mult: 1, bar: 'copper_bar' },
   { id: 'iron', tier: 2, adj: adj('Железн', 'ый', 'ая', 'ое', 'ые', 'Iron'), c1: '#c9ccd6', c2: '#6a6f7c', mult: 1.6, bar: 'iron_bar' },
   { id: 'steel', tier: 3, adj: adj('Стальн', 'ой', 'ая', 'ое', 'ые', 'Steel'), c1: '#a8c0d8', c2: '#4f6275', mult: 2.4, bar: 'steel_bar' },

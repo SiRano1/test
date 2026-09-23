@@ -498,7 +498,7 @@ export class Player extends Actor {
   }
 
   onHurt(_w: World): void {
-    this.invuln = Math.max(this.invuln, 0.55);
+    this.invuln = Math.max(this.invuln, 0.7);
   }
 
   override die(w: World): void {
