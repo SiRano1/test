@@ -65,6 +65,7 @@ export function hitboxTouches(hb: Hitbox, tx: number, ty: number, pad: number): 
 export function resolveHit(w: World, target: Actor, spec: HitSpec, dirX: number, dirY: number): HitResult {
   if (target.dead) return 'miss';
   if (target.invuln > 0) return 'miss';
+  if (w.netMode && w.hooks.canHit && !w.hooks.canHit(spec.source, target)) return 'miss';
 
   const src = spec.source;
   // Блок: удар должен прийти спереди (в пределах ~100° от взгляда цели).

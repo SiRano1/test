@@ -13,7 +13,9 @@
     "test": "vitest run",
     "e2e": "node e2e/smoke.mjs",
     "artifact": "vite build --mode single && node scripts/artifact.mjs",
-    "balance": "tsx scripts/balance.ts"
+    "balance": "tsx scripts/balance.ts",
+    "server": "tsx src/server/main.ts",
+    "e2e:online": "node e2e/online.mjs"
   },
   "devDependencies": {
     "@types/node": "^26.6.2",

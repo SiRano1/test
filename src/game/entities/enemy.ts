@@ -105,8 +105,28 @@ export class Enemy extends Actor {
     }
   }
 
+  private foeRef: Actor | null = null;
+  private foeT = 0;
+
+  /** Цель: в одиночной игре — герой, в сетевой — ближайший живой герой (пересматривается 4 раза в секунду). */
+  protected foe(w: World): Actor | null {
+    if (!w.netMode) return w.player;
+    if (this.foeRef && !this.foeRef.dead && !this.foeRef.removed && w.time - this.foeT < 0.25) return this.foeRef;
+    let best: Actor | null = null, bd = Infinity;
+    for (const h of w.livingHeroes()) {
+      const d = dist(this.x, this.y, h.x, h.y);
+      if (d < bd) {
+        bd = d;
+        best = h;
+      }
+    }
+    this.foeRef = best;
+    this.foeT = w.time;
+    return best;
+  }
+
   protected canSee(w: World): boolean {
-    const p = w.player;
+    const p = this.foe(w);
     if (!p || p.dead) return false;
     const d = dist(this.x, this.y, p.x, p.y);
     if (d > this.def.aggro * 16) return false;
@@ -147,7 +167,7 @@ export class Enemy extends Actor {
   }
 
   protected think(w: World, dt: number): void {
-    const p = w.player;
+    const p = this.foe(w)!;
     switch (this.state) {
       case 'idle': {
         this.wander(w, dt);
@@ -218,7 +238,7 @@ export class Enemy extends Actor {
   }
 
   protected chooseAttack(w: World, d: number): AttackDef | null {
-    const p = w.player;
+    const p = this.foe(w);
     if (!p) return null;
     const los = w.map.lineOfSight(this.x, this.y - 4, p.x, p.y - 4);
     const ready = this.def.attacks.filter(
@@ -229,7 +249,7 @@ export class Enemy extends Actor {
   }
 
   protected beginAttack(w: World, a: AttackDef): void {
-    const p = w.player;
+    const p = this.foe(w);
     this.atk = a;
     this.setState('windup');
     this.lockAngle = p ? Math.atan2(p.y - this.y, p.x - this.x) : 0;
@@ -311,7 +331,7 @@ export class Enemy extends Actor {
   }
 
   protected approach(w: World, dt: number, d: number): void {
-    const p = w.player!;
+    const p = this.foe(w)!;
     const sp = this.def.speed * this.moveMul() * (this.flyer ? 1 : w.map.groundMul(this.x, this.y));
     let tx = p.x, ty = p.y;
     const keep = this.def.keepDistance;

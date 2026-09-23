@@ -31,7 +31,7 @@ export class Boss extends Enemy {
   override update(w: World, dt: number): void {
     if (!this.awake) {
       this.animT += dt;
-      const p = w.player;
+      const p = this.foe(w);
       if (p && !p.dead && Math.hypot(p.x - this.x, p.y - this.y) < 110) this.wake(w);
       return;
     }
@@ -70,7 +70,7 @@ export class Boss extends Enemy {
   }
 
   protected override chooseAttack(w: World, d: number): AttackDef | null {
-    const p = w.player;
+    const p = this.foe(w);
     if (!p) return null;
     const ready = this.def.attacks.filter((a) => {
       const weight = a.weight === 0 ? (this.phase >= 2 ? 2 : 0) : (a.weight ?? 1);
@@ -81,7 +81,7 @@ export class Boss extends Enemy {
   }
 
   protected override execute(w: World, a: AttackDef): void {
-    const p = w.player;
+    const p = this.foe(w);
     if (a.kind === 'slam' && p) {
       // «Дождь» маркеров вокруг героя: форма зависит от босса
       const spec = this.spec(a);

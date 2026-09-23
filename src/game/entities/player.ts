@@ -181,8 +181,11 @@ export class Player extends Actor {
     }
   }
 
+  /** Ввод этого героя в сетевой игре (у каждого свой); в одиночной — ввод мира. */
+  netInput: InputFrame | null = null;
+
   override update(w: World, dt: number): void {
-    const inp = w.input;
+    const inp = this.netInput ?? w.input;
     this.st += dt;
     this.animT += dt;
     this.flash = Math.max(0, this.flash - dt);

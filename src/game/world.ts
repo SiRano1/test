@@ -80,6 +80,18 @@ export class World {
   tier: TierDef | null = null;
   /** Произвольные данные сцены (комнаты, арена босса…). */
   meta: Record<string, unknown> = {};
+  /**
+   * Сетевой режим (сервер): героев несколько, у каждого свой ввод, мир не замирает от хитстопа,
+   * урон и парирования уходят в хуки комнаты.
+   */
+  netMode = false;
+  heroes: Actor[] = [];
+  hooks: {
+    damage?(target: Actor, spec: HitSpec, n: number): void;
+    parry?(target: Actor, src: Actor | null): void;
+    /** Вето на удар (безопасные зоны). */
+    canHit?(src: Actor | null, target: Actor): boolean;
+  } = {};
   private pending: Entity[] = [];
 
   constructor(
@@ -114,6 +126,7 @@ export class World {
   }
 
   hitstop(t: number): void {
+    if (this.netMode) return;
     this.hitstopT = Math.max(this.hitstopT, t);
   }
 
@@ -129,6 +142,12 @@ export class World {
 
   actors(): Actor[] {
     return this.entities.filter((e): e is Actor => e instanceof Actor && !e.dead);
+  }
+
+  /** Все живые герои: в одиночной игре — один игрок, на сервере — все подключённые. */
+  livingHeroes(): Actor[] {
+    if (!this.netMode) return this.player && !this.player.dead ? [this.player] : [];
+    return this.heroes.filter((h) => !h.dead && !h.removed);
   }
 
   enemies(): Actor[] {
@@ -148,6 +167,11 @@ export class World {
   }
 
   onParry(target: Actor, _src: Actor | null): void {
+    if (this.netMode) {
+      (target as any).onParried?.();
+      this.hooks.parry?.(target, _src);
+      return;
+    }
     if (target === this.player) {
       (this.player as any).onParried?.();
       const cls = (this.player as any).weaponCls as WeaponClass | undefined;
@@ -156,6 +180,10 @@ export class World {
   }
 
   onDamage(target: Actor, spec: HitSpec, n: number): void {
+    if (this.netMode) {
+      this.hooks.damage?.(target, spec, n);
+      return;
+    }
     if (spec.source === this.player && spec.cls) this.game.addClassXp(spec.cls, 1 + n / 12);
     if (target === this.player) (this.player as any).onHurt?.(this);
   }

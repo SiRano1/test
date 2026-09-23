@@ -51,7 +51,7 @@ export abstract class Entity {
 }
 
 /** 'trap' — ловушки: бьют и героя, и чудовищ. */
-export type Team = 'player' | 'enemy' | 'neutral' | 'trap';
+export type Team = 'player' | 'enemy' | 'neutral' | 'trap' | `p:${string}`;
 
 export interface Status {
   id: StatusId;
