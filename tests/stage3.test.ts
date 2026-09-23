@@ -341,8 +341,10 @@ describe('Праздники', () => {
     const g = Game.newGame('T', 76);
     festDay(g, 3, 25, 17 * 60);
     g.festival('giver');
-    const target = g.state.fest.target!;
-    expect(target).toBeTruthy();
+    expect(g.state.fest.target).toBeTruthy();
+    // адресат случаен — для проверки множителя берём Миру (не именинница, очки не упираются в ноль)
+    const target = (g.state.fest.target = 'mira');
+    npcState(g.state, target).points = 1000;
     g.give('apple', 1);
     const p0 = npcState(g.state, target).points;
     g.giveGift(target, g.state.inventory.findIndex((s) => s?.def === 'apple'));

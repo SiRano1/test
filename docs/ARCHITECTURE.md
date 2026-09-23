@@ -25,11 +25,12 @@ src/
   core/               без DOM: математика, RNG, события, тайловая карта и коллизии, поиск пути
   data/               контент как данные: предметы, монстры, ярусы, NPC, диалоги, рецепты, лор, строки
   game/               без DOM: правила и симуляция
-    entities/         Player, Enemy, Npc, Projectile, Pickup, Prop
+    entities/         Player, Enemy, Boss, Npc, Companion, Customer, Projectile, Pickup, Prop, ловушки и головоломки (traps.ts)
     combat/           урон, статусы, хитбоксы, ИИ монстров и боссов
     dungeon/          генератор этажей, комнаты, ловушки, головоломки
     town/             карта города, интерьеры, расписания NPC
-    systems/          инвентарь, лут, экономика, календарь, отношения, задания, крафт, сохранения
+    systems/          инвентарь, лут, экономика, календарь, отношения, крафт, сад, сохранения,
+                      таланты (talents.ts), праздники (festivals.ts), своя лавка (playershop.ts), аукцион (auction.ts)
     world.ts          текущая сцена: карта + сущности + шаг симуляции
     game.ts           корневое состояние игры, переходы сцен, фасад для UI
   client/             браузер
@@ -99,18 +100,23 @@ Loc = { ru: string; en: string }
 ItemStack { uid: string, def: string, qty: number, rarity: 0..3, affixes: Affix[], upgrade: 0..5 }
 Affix     { id: string, value: number }
 
-SaveData {
-  version: number, createdAt, playtime,
-  hero: { name, level, xp, hp, stamina, energy, gold, classXp: Record<Cls, number>, skills: string[] },
-  inventory: (ItemStack|null)[], equipment: Record<Slot, ItemStack|null>, storage: ItemStack[],
-  calendar: { day, season, year, minutes, weather, tomorrowWeather },
-  dungeon: { deepest: number, elevator: number[], shards: number[], loreFound: string[] },
-  npcs: Record<npcId, { points, talkedToday, giftsWeek, flags: string[] }>,
-  factions: Record<factionId, number>,
-  manor: { stage: number, upgrades: string[], garden: Plot[], shop: ShopState },
-  economy: { demand: Record<itemId, number>, priceBook: Record<itemId, Reaction[]> },
-  quests: Record<questId, { stage, done }>, flags: string[], stats: Record<string, number>,
-  settings: { lang: 'ru'|'en', volume, shake: boolean }
+SaveData {   // SAVE_VERSION = 3
+  version: number, seed, playtime,
+  hero: { name, level, xp, hp, stamina, mana, energy, gold, classXp: Record<Cls, number> },
+  inventory: (ItemStack|null)[], equipment: Record<Slot, ItemStack|null>, storage: (ItemStack|null)[], quick,
+  time: { day, season, year, minutes, weather, tomorrow, totalDays },
+  dungeon: { deepest: number, elevator: number[], bosses: number[] }, lore: string[],
+  npcs: Record<npcId, { points, talkedToday, giftedToday, giftsWeek, flags: string[] }>,
+  factions: Record<factionId, number>, flags: Record<string, boolean>, stats: Record<string, number>,
+  manor: { upgrades: string[], building: { id, daysLeft } | null, garden: Plot[] },
+  economy: { demand: Record<itemId, number>, rotating: ItemStack[] },
+  quests: Record<questId, { status, progress, base }>, recipes: string[], giftLog,
+  companion, romance: { partner, stage, weddingDay }, ending, talents: string[],
+  fest: { key, target, heard: string[], done: string[] },                 // текущий праздник
+  shop: { displays: ({ stack, price } | null)[8], popularity, book, sales, income },
+  auction: { lots: NpcLot[], mine: MyLot[], mail: ItemStack[], history: Record<itemId, number[]>, day },
+  location: { scene, x, y },
+  settings: { lang, volume, shake, story, flashes, speed, contrast }
 }
 ```
 Сохранение хранится в `localStorage` (3 слота). Есть экспорт и импорт в JSON-файл.

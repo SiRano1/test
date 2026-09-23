@@ -130,7 +130,8 @@ function applyDamage(w: World, target: Actor, spec: HitSpec, dirX: number, dirY:
     if (spec.status && rng.chance(spec.status.chance)) target.addStatus(spec.status.id, spec.status.duration, spec.status.power ?? 1);
     if ((spec.fire ?? 0) > 0 && rng.chance(0.2)) target.addStatus('burn', 3, Math.max(1, (spec.fire ?? 0) / 3));
     if ((spec.ice ?? 0) > 0 && rng.chance(0.3)) target.addStatus('slow', 2);
-    if (spec.element === 'fire' && rng.chance(0.25)) target.addStatus('burn', 3, Math.max(1, spec.dmg / 12));
+    // поджог от стихии — от реально нанесённого урона (после защиты), иначе огонь боссов игнорирует броню
+    if (spec.element === 'fire' && rng.chance(0.25)) target.addStatus('burn', 3, Math.max(1, n / 12));
     if (spec.element === 'ice' && rng.chance(0.35)) target.addStatus('slow', 2.5);
     if (spec.stunOnHit) target.stun = Math.max(target.stun, spec.stunOnHit);
   }

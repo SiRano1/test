@@ -7,6 +7,7 @@ import { findPath } from '../src/core/pathfind';
 import { Tile } from '../src/core/tilemap';
 import { itemDef } from '../src/data/items';
 import { Enemy } from '../src/game/entities/enemy';
+import { Marker } from '../src/game/entities/marker';
 import { Game } from '../src/game/game';
 import type { Action, InputFrame } from '../src/game/input';
 import { World } from '../src/game/world';
@@ -56,7 +57,8 @@ function run(seed: number): RunStats {
     g.state.equipment.body = { uid: 'k2', def: `${metal}_body`, qty: 1, rarity: 0, affixes: [], upgrade: 0 };
     g.state.equipment.head = { uid: 'k3', def: `${metal}_head`, qty: 1, rarity: 0, affixes: [], upgrade: 0 };
     g.state.hero.level = Number(process.env.KIT);
-    g.give('potion_small', 6);
+    // зелья по глубине: подготовленный игрок берёт то, что продают к этому ярусу
+    g.give(startFloor >= 45 ? 'potion_big' : startFloor >= 15 ? 'potion_heal' : 'potion_small', Number(process.env.POTIONS ?? 6));
     g.refreshStats();
     g.player.hp = g.player.maxHp;
   }
@@ -114,7 +116,7 @@ function run(seed: number): RunStats {
     const enemies = w.enemies() as Enemy[];
     // лечение
     if (p.hp < p.maxHp * 0.35) {
-      const idx = g.state.inventory.findIndex((s) => s && (s.def === 'potion_small' || s.def === 'potion_heal'));
+      const idx = g.state.inventory.findIndex((s) => s && (s.def === 'potion_small' || s.def === 'potion_heal' || s.def === 'potion_big'));
       if (idx >= 0) {
         g.useItem(idx);
         st.potions++;
@@ -133,6 +135,14 @@ function run(seed: number): RunStats {
     // уклонение от замаха
     const threat = enemies.find((e) => e.state === 'windup' && e.atk && e.st > e.atk.windup * 0.55 && dist(p.x, p.y, e.x, e.y) < (e.atk.range ?? 30) + 18);
     let inp: InputFrame;
+    // метки ударов по площади: выйти из круга (человек видит их заранее)
+    const mark = w.entities.find((e): e is Marker => e instanceof Marker && !e.removed && dist(p.x, p.y, e.x, e.y) < e.r + 6);
+    if (mark) {
+      const ax = p.x - mark.x || 1, ay = p.y - mark.y;
+      inp = frame(ax, ay, mark.p > 0.7 && p.stamina > 25 ? ['dodge'] : []);
+      g.update(DT, inp);
+      continue;
+    }
     if (threat && p.stamina > 25) {
       const ax = p.x - threat.x, ay = p.y - threat.y;
       inp = frame(ax, ay, ['dodge']);
@@ -190,7 +200,10 @@ function run(seed: number): RunStats {
       }
     }
     if (g.boss) st.bossTime += DT;
+    const hp0 = p.hp, logged = sumDmg();
     g.update(DT, inp);
+    const lost = hp0 - p.hp - (sumDmg() - logged);
+    if (lost > 0 && !p.dead) dmgBy.statuses = (dmgBy.statuses ?? 0) + lost;
     if (floorT > 240) {
       // слишком долго на этаже — вниз
       g.descend();
@@ -201,8 +214,9 @@ function run(seed: number): RunStats {
   return st;
 }
 
-// учёт урона по герою от каждого вида монстров
+// учёт урона по герою от каждого вида монстров (и от статусов — отдельно)
 const dmgBy: Record<string, number> = {};
+const sumDmg = () => Object.entries(dmgBy).reduce((a, [k, v]) => (k === 'statuses' ? a : a + v), 0);
 const orig = World.prototype.onDamage;
 World.prototype.onDamage = function (target, spec, n) {
   if (target === this.player && spec.source) {

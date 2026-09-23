@@ -208,7 +208,7 @@ add({
 });
 add({
   id: 'spore_mother', name: L('Матерь Спор', 'The Spore Mother'), sprite: 'spore_mother', tier: 3,
-  hp: 1300, atk: 20, def: 8, speed: 0, xp: 800, gold: [350, 500], hw: 14, hh: 8, poise: 1, mass: 50,
+  hp: 1500, atk: 20, def: 8, speed: 0, xp: 800, gold: [350, 500], hw: 14, hh: 8, poise: 1, mass: 50,
   ai: 'boss', aggro: 20, boss: true, threat: 0, light: { r: 60, color: '#c8e880' },
   attacks: [
     { id: 'cloud', kind: 'nova', dmg: 0.8, range: 90, radius: 70, windup: 1.2, active: 0.3, recover: 1.4, cooldown: 5, status: { id: 'slow', chance: 1, duration: 3 }, weight: 2 },
@@ -254,7 +254,7 @@ add({
 });
 add({
   id: 'brodrik', name: L('Железный Тан Бродрик', 'Iron Thane Brodrik'), sprite: 'brodrik', tier: 4,
-  hp: 2000, atk: 26, def: 18, speed: 36, xp: 1200, gold: [500, 700], hw: 10, hh: 6, poise: 1, mass: 8,
+  hp: 1900, atk: 25, def: 16, speed: 36, xp: 1200, gold: [500, 700], hw: 10, hh: 6, poise: 1, mass: 8,
   ai: 'boss', aggro: 20, boss: true, threat: 0, light: { r: 40, color: '#ff7a30' }, resist: { fire: 0.6 },
   attacks: [
     { id: 'hammer', kind: 'arc', dmg: 1.3, range: 34, radius: 42, arc: 1.4, windup: 0.95, active: 0.2, recover: 0.8, cooldown: 0.6, weight: 3 },
@@ -353,10 +353,10 @@ add({
 });
 add({
   id: 'ash_seraph', name: L('Серафим Пепла', 'The Ash Seraph'), sprite: 'ash_seraph', tier: 6,
-  hp: 3300, atk: 40, def: 20, speed: 54, xp: 2400, gold: [900, 1200], hw: 10, hh: 6, poise: 1, mass: 6, flyer: true,
+  hp: 3000, atk: 34, def: 18, speed: 54, xp: 2400, gold: [900, 1200], hw: 10, hh: 6, poise: 1, mass: 6, flyer: true,
   ai: 'boss', aggro: 20, boss: true, threat: 0, light: { r: 60, color: '#ffb040' }, resist: { fire: 1 },
   attacks: [
-    { id: 'dive', kind: 'lunge', dmg: 1.4, range: 200, minRange: 50, windup: 0.9, active: 0.5, recover: 0.8, cooldown: 3, lungeSpeed: 280, element: 'fire', weight: 2 },
+    { id: 'dive', kind: 'lunge', dmg: 1.3, range: 200, minRange: 50, windup: 0.95, active: 0.5, recover: 0.9, cooldown: 4, lungeSpeed: 280, element: 'fire', weight: 2 },
     { id: 'wing', kind: 'arc', dmg: 1.2, range: 32, radius: 40, arc: 1.6, windup: 0.7, active: 0.15, recover: 0.6, cooldown: 0.8, element: 'fire', weight: 3 },
     { id: 'crosses', kind: 'slam', dmg: 1.3, range: 400, radius: 24, windup: 1.3, active: 0.2, recover: 0.8, cooldown: 6, element: 'fire', weight: 1, unblockable: true },
     { id: 'choir', kind: 'summon', dmg: 0, range: 400, windup: 1.2, active: 0.1, recover: 1, cooldown: 14, summon: { id: 'pilgrim', count: 2, max: 3 }, weight: 0 },
@@ -396,10 +396,10 @@ add({
 });
 add({
   id: 'halvard', name: L('Хальвард, Скованный Король', 'Halvard, the Chained King'), sprite: 'halvard', tier: 7,
-  hp: 5200, atk: 48, def: 26, speed: 52, xp: 4000, gold: [1500, 2000], hw: 9, hh: 6, poise: 1, mass: 8,
+  hp: 4800, atk: 42, def: 24, speed: 52, xp: 4000, gold: [1500, 2000], hw: 9, hh: 6, poise: 1, mass: 8,
   ai: 'boss', aggro: 20, boss: true, threat: 0, light: { r: 50, color: '#c8a8ff' },
   attacks: [
-    { id: 'riposte', kind: 'arc', dmg: 1.2, range: 32, radius: 38, arc: 1.3, windup: 0.55, active: 0.15, recover: 0.45, cooldown: 0.4, weight: 4 },
+    { id: 'riposte', kind: 'arc', dmg: 1.2, range: 32, radius: 38, arc: 1.3, windup: 0.6, active: 0.15, recover: 0.5, cooldown: 0.7, weight: 4 },
     { id: 'lunge', kind: 'lunge', dmg: 1.4, range: 150, minRange: 40, windup: 0.7, active: 0.4, recover: 0.8, cooldown: 3, lungeSpeed: 280, weight: 2 },
     { id: 'tendrils', kind: 'slam', dmg: 1.3, range: 400, radius: 26, windup: 1.2, active: 0.2, recover: 0.8, cooldown: 6, weight: 0, unblockable: true },
     { id: 'hunger', kind: 'nova', dmg: 1.4, range: 70, radius: 84, windup: 1.4, active: 0.25, recover: 1, cooldown: 8, weight: 0, unblockable: true },
