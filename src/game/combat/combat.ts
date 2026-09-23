@@ -120,7 +120,7 @@ function applyDamage(w: World, target: Actor, spec: HitSpec, dirX: number, dirY:
     crit = true;
     dmg *= target.stun > 0 ? Math.max(spec.critMul, 2.5) : spec.critMul;
   }
-  dmg *= rng.range(0.9, 1.1);
+  dmg *= rng.range(0.9, 1.1) * target.dmgTakenMul;
   const n = Math.max(1, Math.round(dmg));
   target.hp -= n;
   target.flash = 0.12;

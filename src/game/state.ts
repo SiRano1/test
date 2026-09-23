@@ -82,8 +82,24 @@ export interface GameState {
   /** Где герой находится (для загрузки). Подземелье не сохраняется — загрузка у склепа. */
   location: { scene: SceneRef; x: number; y: number };
   playtime: number;
-  settings: { lang: 'ru' | 'en'; volume: number; shake: boolean };
+  settings: Settings;
 }
+
+export interface Settings {
+  lang: 'ru' | 'en';
+  volume: number;
+  shake: boolean;
+  /** Сюжетный режим: вдвое меньше урона герою, смерть без потерь. */
+  story: boolean;
+  /** Вспышки экрана (выкл — для светочувствительных). */
+  flashes: boolean;
+  /** Скорость игры: 0.7 / 0.85 / 1. */
+  speed: number;
+  /** Контрастные метки атак врагов. */
+  contrast: boolean;
+}
+
+export const DEFAULT_SETTINGS: Settings = { lang: 'ru', volume: 0.6, shake: true, story: false, flashes: true, speed: 1, contrast: false };
 
 export type GiftReaction = 'love' | 'like' | 'neutral' | 'dislike' | 'hate';
 
@@ -147,7 +163,7 @@ export function newGameState(name: string, seed: number): GameState {
     auction: { lots: [], mine: [], mail: [], history: {}, day: 0 },
     location: { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 },
     playtime: 0,
-    settings: { lang: 'ru', volume: 0.6, shake: true },
+    settings: { ...DEFAULT_SETTINGS },
   };
 }
 

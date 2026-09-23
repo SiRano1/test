@@ -10,6 +10,8 @@ import { endingConditions } from '../src/data/endings';
 import { npcState } from '../src/game/state';
 import { Enemy } from '../src/game/entities/enemy';
 import { Npc } from '../src/game/entities/npc';
+import { Pickup } from '../src/game/entities/pickup';
+import { migrate } from '../src/game/systems/save';
 import { SpiritProp } from '../src/game/systems/festivals';
 import { sellPrice } from '../src/game/systems/economy';
 import { SHOPS } from '../src/data/shops';
@@ -444,5 +446,83 @@ describe('Аукцион', () => {
     expect(a.mail.some((s) => s.def === 'copper_bar')).toBe(true);
     g.auctionCollect();
     expect(a.mail.length).toBe(0);
+  });
+});
+
+describe('Бездна', () => {
+  it('ниже 70-го этажа — только после финала', () => {
+    const g = Game.newGame('T', 101);
+    g.goTo({ kind: 'dungeon', floor: 70 });
+    run(g, 1);
+    g.descend();
+    run(g, 1);
+    expect(g.scene.kind === 'dungeon' && g.scene.floor).toBe(70);
+    g.state.ending = 'restore';
+    g.descend();
+    run(g, 1);
+    expect(g.scene.kind === 'dungeon' && g.scene.floor).toBe(71);
+    expect(g.world.tier?.id).toBe(8);
+    expect(g.world.enemies().length).toBeGreaterThan(3);
+    expect(g.state.stats.abyssDeepest).toBe(71);
+  });
+
+  it('эхо боссов по кругу, сильнее на глубине, без осколков Печати', () => {
+    const hp: number[] = [];
+    for (const [floor, id] of [[80, 'bone_abbot'], [90, 'gorm'], [140, 'bone_abbot']] as const) {
+      const g = Game.newGame('T', 110 + floor);
+      g.state.ending = 'free';
+      g.goTo({ kind: 'dungeon', floor });
+      run(g, 0.6);
+      const b = bossOn(g)!;
+      expect(b.def.id).toBe(id);
+      hp.push(b.maxHp);
+      if (floor === 90) {
+        b.die(g.world);
+        run(g, 0.2);
+        const drops = g.world.entities.filter((e): e is Pickup => e instanceof Pickup && !!e.stack).map((p) => p.stack!.def);
+        expect(drops.some((d) => d.startsWith('shard_'))).toBe(false);
+        expect(drops).toContain('abyss_shard');
+      }
+    }
+    expect(hp[2]).toBeGreaterThan(hp[0]!);
+  });
+
+  it('проклятия этажей встречаются', () => {
+    const curses = new Set<string>();
+    for (let i = 0; i < 12; i++) {
+      const g = Game.newGame('T', 130 + i);
+      g.state.ending = 'restore';
+      g.goTo({ kind: 'dungeon', floor: 73 + i });
+      run(g, 0.6);
+      curses.add(String(g.world.meta.curse));
+    }
+    expect(curses.size).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('Доступность', () => {
+  it('сюжетный режим: вдвое меньше урона и смерть без потерь', () => {
+    const hit = (story: boolean) => {
+      const g = Game.newGame('T', 141);
+      g.state.settings.story = story;
+      g.refreshStats();
+      g.goTo({ kind: 'dungeon', floor: 3 });
+      run(g, 1);
+      for (const e of g.world.enemies()) g.world.remove(e);
+      const hp0 = g.player.hp;
+      g.player.invuln = 0;
+      g.world.spawnHitbox({ owner: g.player, team: 'trap', shape: 'circle', x: g.player.x, y: g.player.y - 4, r: 10, angle: 0, half: Math.PI, follow: false, ox: 0, oy: 0, t: 0.05, delay: 0, breaks: false, spec: { dmg: 40, crit: 0, critMul: 1, knock: 0, source: null, unblockable: true } });
+      run(g, 0.1);
+      return hp0 - g.player.hp;
+    };
+    const normal = hit(false), story = hit(true);
+    expect(story).toBeLessThan(normal * 0.7);
+  });
+
+  it('старые сохранения получают настройки по умолчанию', () => {
+    const m = migrate({ version: 2, hero: { name: 'A' }, settings: { lang: 'en', volume: 0.3, shake: false }, flags: {}, stats: {} });
+    expect(m.settings.lang).toBe('en');
+    expect(m.settings.speed).toBe(1);
+    expect(m.settings.flashes).toBe(true);
   });
 });

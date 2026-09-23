@@ -54,6 +54,7 @@ function boot(): void {
   };
   const persistSettings = () => {
     const st = game ? game.state.settings : ui.titleSettings;
+    if (game) Object.assign(ui.titleSettings, st);
     try {
       kv.setItem(SETTINGS_KEY, JSON.stringify(st));
     } catch {
@@ -123,8 +124,8 @@ function boot(): void {
   const frame = (now: number) => {
     const dt = Math.min(0.1, (now - last) / 1000);
     last = now;
-    acc += dt;
     const g = game;
+    acc += dt * (g?.state.settings.speed ?? 1);
     if (g) {
       while (acc >= STEP) {
         acc -= STEP;

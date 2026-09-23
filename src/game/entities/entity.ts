@@ -82,6 +82,8 @@ export abstract class Actor extends Entity {
   blockStart = -99;
   blockRatio = 0.6;
   parryWindow = 0.15;
+  /** Множитель входящего урона (сюжетный режим). */
+  dmgTakenMul = 1;
   /** Направление взгляда/прицела (рад). */
   aim = Math.PI / 2;
   override pushable = true;

@@ -50,6 +50,7 @@ for (const [m, bar] of metals) {
 }
 r('forge_ring', 'anvil', [['copper_bar', 1], ['pearl', 1]], ['ring', 1], 6, 40);
 r('forge_amulet', 'anvil', [['iron_bar', 1], ['pearl', 1], ['bone', 2]], ['amulet', 1], 8, 50);
+r('forge_abyss_ring', 'anvil', [['abyss_shard', 12], ['heartstone', 2], ['royal_gold', 2]], ['abyss_ring', 1], 12, 90);
 
 // ── Алхимия ──
 r('brew_small', 'alchemy', [['grave_moss', 2], ['glass', 1]], ['potion_small', 2], 5, 30);

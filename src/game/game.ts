@@ -274,7 +274,11 @@ export class Game implements GameApi, DialogueHost {
   private onEnterFloor(floor: number): void {
     const d = this.state.dungeon;
     if (floor > d.deepest) d.deepest = floor;
-    const tier = Math.ceil(floor / 10);
+    if (floor > 70 && floor > (this.state.stats.abyssDeepest ?? 70)) {
+      this.state.stats.abyssDeepest = floor;
+      if (floor % 10 === 1 || floor % 10 === 0) this.toast(t(L(`Бездна: новый рекорд — этаж ${floor}`, `Abyss: new record — floor ${floor}`)), '#c0a8ff');
+    }
+    const tier = Math.min(8, Math.ceil(floor / 10));
     if (floor % 10 === 1 && !this.state.flags[`tier_seen_${tier}`]) {
       this.state.flags[`tier_seen_${tier}`] = true;
       setTimeout(() => this.events.emit('tierEnter', { tier }), 700);
@@ -288,7 +292,11 @@ export class Game implements GameApi, DialogueHost {
 
   descend(): void {
     if (this.scene.kind !== 'dungeon') return;
-    const next = Math.min(this.scene.floor + 1, MAX_STORY_FLOOR + 30);
+    if (this.scene.floor >= MAX_STORY_FLOOR && !this.state.ending) {
+      this.toast(t(L('Ниже Трона — только тьма. Сперва решите судьбу Печати.', 'Below the Throne there is only dark. First decide the fate of the Seal.')), '#c0a8ff');
+      return;
+    }
+    const next = this.scene.floor + 1;
     this.useEnergy(1, true);
     this.world.fx({ t: 'sfx', id: 'stairs' });
     this.goTo({ kind: 'dungeon', floor: next });
@@ -485,13 +493,14 @@ export class Game implements GameApi, DialogueHost {
 
   private respawnAfterDeath(): void {
     const h = this.state.hero;
-    const goldLoss = Math.min(1000, Math.floor(h.gold * 0.1));
+    const story = this.state.settings.story;
+    const goldLoss = story ? 0 : Math.min(1000, Math.floor(h.gold * 0.1));
     h.gold -= goldLoss;
-    // до 4 стопок из добычи этого спуска
+    // до 4 стопок из добычи этого спуска (в сюжетном режиме — без потерь)
     const candidates: number[] = [];
     this.state.inventory.forEach((s, i) => s && this.runLoot.has(s.uid) && itemDef(s.def).kind !== 'quest' && candidates.push(i));
     this.rng.shuffle(candidates);
-    const lost = candidates.slice(0, Math.min(4, candidates.length));
+    const lost = story ? [] : candidates.slice(0, Math.min(4, candidates.length));
     for (const i of lost) this.state.inventory[i] = null;
     this.state.stats.deaths = (this.state.stats.deaths ?? 0) + 1;
     this.state.flags.woke_infirmary = true;

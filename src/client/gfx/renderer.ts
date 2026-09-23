@@ -53,6 +53,9 @@ export class Renderer {
     [this.lightCanvas, this.lightCtx] = makeCanvas(VIEW_W, VIEW_H);
   }
 
+  /** Контрастные метки атак (настройка доступности). */
+  contrast = false;
+
   flash(color: string, dur: number): void {
     this.flashColor = color;
     this.flashT = this.flashDur = dur;
@@ -87,6 +90,7 @@ export class Renderer {
 
   render(game: Game, dt: number): void {
     this.game = game;
+    this.contrast = game.state.settings.contrast;
     const ctx = this.ctx;
     const w = game.world;
     const season = game.state.time.season;
@@ -170,10 +174,12 @@ export class Renderer {
     if (!tg) return;
     const ctx = this.ctx;
     const x = tg.x - cx, y = tg.y - cy;
-    const a = 0.15 + tg.p * 0.35;
-    ctx.fillStyle = `rgba(255,50,40,${a})`;
-    ctx.strokeStyle = `rgba(255,120,100,${0.4 + tg.p * 0.5})`;
-    ctx.lineWidth = 1;
+    // контрастный режим: яркая жёлто-пурпурная метка и толстый контур
+    const hc = this.contrast;
+    const a = hc ? 0.35 + tg.p * 0.4 : 0.15 + tg.p * 0.35;
+    ctx.fillStyle = hc ? `rgba(255,0,200,${a})` : `rgba(255,50,40,${a})`;
+    ctx.strokeStyle = hc ? `rgba(255,240,0,${0.7 + tg.p * 0.3})` : `rgba(255,120,100,${0.4 + tg.p * 0.5})`;
+    ctx.lineWidth = hc ? 2 : 1;
     ctx.beginPath();
     if (tg.kind === 'arc') {
       ctx.moveTo(x, y);
@@ -418,7 +424,7 @@ export class Renderer {
         this.lightningT -= dt;
         if (this.lightningT <= 0) {
           this.lightningT = 6 + Math.random() * 10;
-          this.flash('#e8f0ff', 0.25);
+          if (game.state.settings.flashes) this.flash('#e8f0ff', 0.25);
           game.events.emit('fx', { t: 'sfx', id: 'thunder' });
         }
       }

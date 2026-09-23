@@ -3,7 +3,8 @@ import { hashSeed, Rng } from '../../core/rng';
 import { Tile, type TileMap } from '../../core/tilemap';
 import { loreForFloor } from '../../data/lore';
 import { tr } from '../../data/strings';
-import { isBossFloor, isElevatorFloor, tierForFloor, type TierDef } from '../../data/tiers';
+import { bossForFloor, CURSE_NAMES, isAbyss, isBossFloor, isElevatorFloor, tierForFloor, type AbyssCurse, type TierDef } from '../../data/tiers';
+import { t } from '../../data/loc';
 import { monsterDef } from '../../data/monsters';
 import { Boss } from '../entities/boss';
 import { Enemy } from '../entities/enemy';
@@ -62,7 +63,7 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
 
   if (bossFloor) {
     if (bossAlive && layout.boss && !(floor === 70 && s.flags.free_fight)) {
-      const b = new Boss(tier.boss, layout.boss.x, layout.boss.y, floor);
+      const b = new Boss(bossForFloor(floor), layout.boss.x, layout.boss.y, floor);
       b.arena = layout.boss.arena;
       w.addNow(b);
     }
@@ -75,6 +76,14 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   // треснувшие стены
   for (const [tx, ty] of layout.cracked) w.addNow(new CrackedWall(tx, ty));
 
+  // проклятие этажа Бездны
+  const curse: AbyssCurse | null = isAbyss(floor) ? rng.pick(['dark', 'bloodmoon', 'swarm', 'hoard', 'dark', 'swarm'] as const) : null;
+  if (curse) {
+    w.meta.curse = curse;
+    if (curse === 'dark') w.darkness = 0.985;
+    setTimeout(() => game.toast(t(CURSE_NAMES[curse]), '#c0a8ff'), 1200);
+  }
+
   // комната-головоломка
   const puzzleCands = layout.rooms.filter((r) => r.role === 'combat' && r.depth >= 8 && r.w >= 6 && r.h >= 5);
   const puzzleRoom = floor >= 3 && puzzleCands.length && rng.chance(0.3) ? rng.pick(puzzleCands) : null;
@@ -84,7 +93,7 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   }
 
   // монстры по бюджету угрозы
-  const budget = 6 + floor * 1.3 + (floor % 10) * 0.4;
+  const budget = (6 + Math.min(floor, 70) * 1.3 + (floor % 10) * 0.4) * (curse === 'swarm' ? 1.4 : 1);
   const fightRooms = layout.rooms.filter((r) => r.role !== 'start' && r.role !== 'secret' && r.role !== 'puzzle');
   const area = fightRooms.reduce((n, r) => n + r.w * r.h, 0);
   for (const r of fightRooms) {
@@ -99,7 +108,8 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
       const pos = randomTile(rng, r, free);
       if (!pos) break;
       mark(pos[0], pos[1]);
-      w.addNow(new Enemy(id, px(pos[0]), px(pos[1]), floor));
+      const e = w.addNow(new Enemy(id, px(pos[0]), px(pos[1]), floor));
+      if (curse === 'bloodmoon') e.atkPower *= 1.25;
       b -= cost;
     }
   }
@@ -116,11 +126,12 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
 
   // сундуки
   for (const r of layout.rooms) {
-    if (r.role === 'treasure' || r.role === 'secret' || (r.role === 'combat' && rng.chance(0.12))) {
+    if (r.role === 'treasure' || r.role === 'secret' || (r.role === 'combat' && rng.chance(curse === 'hoard' ? 0.45 : 0.12))) {
       const pos = centerish(rng, r, free);
       if (!pos) continue;
       mark(pos[0], pos[1]);
-      const q: 0 | 1 | 2 = r.role === 'secret' ? (rng.chance(0.3) ? 2 : 1) : r.role === 'treasure' ? (rng.chance(0.15) ? 2 : 1) : 0;
+      let q: 0 | 1 | 2 = r.role === 'secret' ? (rng.chance(0.3) ? 2 : 1) : r.role === 'treasure' ? (rng.chance(0.15) ? 2 : 1) : 0;
+      if (curse === 'bloodmoon' && q < 2) q = (q + 1) as 1 | 2;
       w.addNow(new Chest(px(pos[0]), pos[1] * TILE + 14, q));
     }
     if (r.role === 'shrine') {
@@ -180,6 +191,7 @@ const TRAPS_BY_TIER: Record<number, TrapKind[]> = {
   5: ['frost', 'dart', 'spikes'],
   6: ['fire', 'spikes'],
   7: ['spikes', 'fire', 'frost', 'dart'],
+  8: ['spikes', 'fire', 'frost', 'spore', 'dart'],
 };
 
 /** Ловушки: шипы полосой, решётки и руны на полу, самострелы в северных стенах. */

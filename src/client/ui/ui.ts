@@ -14,7 +14,7 @@ import { NPCS } from '../../data/npcs';
 import { REACTION_LABEL } from '../../game/systems/relations';
 import { marketValue } from '../../game/systems/playershop';
 import { auctionValue, COMMISSION, DEPOSIT, median, minBid, sellerName } from '../../game/systems/auction';
-import { hearts } from '../../game/state';
+import { DEFAULT_SETTINGS, hearts, type Settings } from '../../game/state';
 import { countItem } from '../../game/systems/inventory';
 import { rotatingPrice } from '../../game/systems/economy';
 import { SEASONS } from '../../game/systems/calendar';
@@ -140,7 +140,7 @@ export class Ui {
       ev.on('boss', () => this.renderBoss()),
       ev.on('panel', () => this.renderPanel()),
       ev.on('ending', (e) => (e ? this.showEnding(e.id) : undefined)),
-      ev.on('tierEnter', (e) => this.dayText(`${tr('tierTitle', { n: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][e.tier - 1] ?? e.tier })} · ${t(tierForFloor(e.tier * 10 - 9).name)}`)),
+      ev.on('tierEnter', (e) => this.dayText(`${tr('tierTitle', { n: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'][e.tier - 1] ?? e.tier })} · ${t(tierForFloor(e.tier * 10 - 9).name)}`)),
       ev.on('scene', () => {
         this.renderQuick();
         this.renderFloorLabel();
@@ -149,7 +149,9 @@ export class Ui {
         if (fx.t === 'sfx') this.audio.play(fx.id, fx.vol);
         else if (fx.t === 'shake') {
           if (game.state.settings.shake) this.renderer.cam.shake(fx.power, fx.dur);
-        } else if (fx.t === 'flash') this.renderer.flash(fx.color, fx.dur);
+        } else if (fx.t === 'flash') {
+          if (game.state.settings.flashes) this.renderer.flash(fx.color, fx.dur);
+        }
         else this.renderer.particles.spawn(fx);
       }),
     );
@@ -667,6 +669,12 @@ export class Ui {
         } })),
       h('div', { class: 'row' }, h('label', null, tr('shake')),
         h('button', { onclick: () => ((st.shake = !st.shake), this.cb.settingsChanged(), g ? this.renderMenu() : this.renderTitle()) }, st.shake ? tr('on') : tr('off'))),
+      h('h2', { style: 'margin-top:6px' }, t(L('Доступность', 'Accessibility'))),
+      this.toggleRow(t(L('Сюжетный режим', 'Story mode')), st.story, () => ((st.story = !st.story), g?.refreshStats()), g, t(L('Вдвое меньше урона, смерть без потерь', 'Half damage taken, no loss on death'))),
+      this.toggleRow(t(L('Вспышки экрана', 'Screen flashes')), st.flashes, () => (st.flashes = !st.flashes), g),
+      this.toggleRow(t(L('Контрастные метки атак', 'High-contrast attack cues')), st.contrast, () => (st.contrast = !st.contrast), g),
+      h('div', { class: 'row' }, h('label', null, t(L('Скорость игры', 'Game speed'))),
+        ...[0.7, 0.85, 1].map((v) => h('button', { class: st.speed === v ? 'focus' : '', onclick: () => ((st.speed = v), this.cb.settingsChanged(), g ? this.renderMenu() : this.renderTitle()) }, `${Math.round(v * 100)}%`))),
       h('h2', { style: 'margin-top:6px' }, tr('controls')),
       h('div', { class: 'help' }, tr('controlsText')),
       h('div', { class: 'help' }, t(L('Геймпад: X — атака, B — перекат, LT — блок, Y — навык, A — действие, RB — смена оружия, крестовина — быстрые слоты.', 'Gamepad: X — attack, B — roll, LT — block, Y — skill, A — interact, RB — swap weapon, D-pad — quick slots.'))),
@@ -674,10 +682,16 @@ export class Ui {
     body.append(box);
   }
 
+  private toggleRow(label: string, on: boolean, flip: () => void, g: Game | null, hint?: string): HTMLElement {
+    return h('div', { class: 'row' }, h('label', null, label),
+      h('button', { onclick: () => { flip(); this.cb.settingsChanged(); if (g) this.renderMenu(); else this.renderTitle(); } }, on ? tr('on') : tr('off')),
+      hint ? h('span', { class: 'sub', style: 'font-size:6px;color:var(--ink-dim)' }, hint) : null);
+  }
+
   private globalSettings() {
     return this.titleSettings;
   }
-  titleSettings = { lang: 'ru' as 'ru' | 'en', volume: 0.6, shake: true };
+  titleSettings: Settings = { ...DEFAULT_SETTINGS };
 
   private setLanguage(l: 'ru' | 'en'): void {
     setLang(l);

@@ -98,6 +98,7 @@ export class Player extends Actor {
     this.blockRatio = this.tal('sh_bastion') ? 0.95 : this.profile.blockRatio;
     this.parryWindow = this.profile.parry + (this.tal('sh_parry') ? 0.1 : 0);
     this.blockCost = this.tal('sh_unbreak') ? 0.5 : 1;
+    this.dmgTakenMul = this.game.state.settings.story ? 0.5 : 1;
   }
 
   tal(id: string): boolean {

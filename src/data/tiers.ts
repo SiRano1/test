@@ -76,11 +76,38 @@ export const TIERS: TierDef[] = [
   },
 ];
 
+TIERS.push({
+  id: 8, name: L('Бездна', 'The Abyss'), floors: [71, 9999],
+  palette: { floor: ['#191526', '#141120', '#201a30'], wall: '#3a2f55', wallDark: '#241d38', top: '#05040a', accent: '#8a70ff', dark: '#000000', mote: '#c0a8ff' },
+  monsters: [['royal_guard', 3], ['shade', 4], ['fire_seraph', 2], ['ice_wraith', 2], ['inquisitor', 1]],
+  elites: ['abyss_knight', 'inquisitor', 'page_keeper', 'hollow_armor'], ores: [['heartstone', 3], ['royal_gold', 2], ['abyss_shard', 1]],
+  boss: 'ash_seraph', darkness: 0.94, decor: ['chain', 'statue', 'bones'], breakable: 'urn',
+});
+
+/** Эхо прежних стражей: боссы Бездны по кругу (без сюжетных Хальварда и Аватара). */
+export const ABYSS_BOSSES = ['bone_abbot', 'gorm', 'spore_mother', 'brodrik', 'keeper_silence', 'ash_seraph'];
+
+export const isAbyss = (floor: number) => floor > 70;
+
+export function bossForFloor(floor: number): string {
+  if (!isAbyss(floor)) return tierForFloor(floor).boss;
+  return ABYSS_BOSSES[(Math.floor(floor / 10) - 8) % ABYSS_BOSSES.length]!;
+}
+
+/** Проклятия этажей Бездны. */
+export type AbyssCurse = 'dark' | 'bloodmoon' | 'swarm' | 'hoard';
+export const CURSE_NAMES: Record<AbyssCurse, Loc> = {
+  dark: L('Густая тьма', 'Thick Darkness'),
+  bloodmoon: L('Кровавая луна: враги сильнее, добыча богаче', 'Blood Moon: stronger foes, richer loot'),
+  swarm: L('Рой: врагов больше', 'Swarm: more foes'),
+  hoard: L('Клад: больше сундуков', 'Hoard: more chests'),
+};
+
 export function tierForFloor(floor: number): TierDef {
   const idx = Math.min(TIERS.length - 1, Math.max(0, Math.floor((floor - 1) / 10)));
   return TIERS[idx]!;
 }
 
-export const isBossFloor = (floor: number) => floor % 10 === 0 && floor <= 70;
+export const isBossFloor = (floor: number) => floor % 10 === 0;
 export const isElevatorFloor = (floor: number) => floor % 5 === 0;
 export const MAX_STORY_FLOOR = 70;

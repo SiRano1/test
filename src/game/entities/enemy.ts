@@ -65,6 +65,14 @@ export class Enemy extends Actor {
     this.atkPower = d.atk * sc;
     this.stats.def = d.def * (1 + 0.05 * Math.max(0, floor - 1));
     this.xp = Math.round(d.xp * (0.8 + 0.2 * sc));
+    if (d.boss && floor > 70) {
+      // Бездна: эхо прежних стражей подтягивается к силе Хальварда и растёт с глубиной
+      const g = 1 + 0.06 * (floor - 80);
+      this.hp = this.maxHp = Math.round(6000 * g);
+      this.atkPower = 46 * g;
+      this.stats.def = 24 * g;
+      this.xp = Math.round(3000 * g);
+    }
     this.hw = d.hw;
     this.hh = d.hh;
     this.poise = d.poise;
@@ -373,7 +381,14 @@ export class Enemy extends Actor {
     w.game.addXp(this.xp);
     const rng = w.rng;
     const stacks = [];
-    for (const [item, chance, min, max] of this.def.drops) if (rng.chance(chance)) stacks.push(makeItem(rng, item, 0, rng.int(min, max)));
+    for (const [item, chance, min, max] of this.def.drops) {
+      // эхо боссов в Бездне не роняет осколков Печати — вместо них осколки бездны
+      if (this.floor > 70 && item.startsWith('shard_')) {
+        stacks.push(makeItem(rng, 'abyss_shard', 0, rng.int(2, 4)));
+        continue;
+      }
+      if (rng.chance(chance)) stacks.push(makeItem(rng, item, 0, rng.int(min, max)));
+    }
     const luck = w.game.stats().luck;
     const eqChance = this.def.boss ? 1 : this.def.elite ? 0.5 : 0.04 + luck * 0.002;
     if (rng.chance(eqChance)) stacks.push(rollEquipment(rng, { floor: this.floor, tier: this.def.tier, luck }, this.def.boss ? 4 : this.def.elite ? 2 : 0, this.def.boss ? 2 : 0));
