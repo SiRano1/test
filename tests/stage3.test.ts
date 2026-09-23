@@ -15,6 +15,8 @@ import { sellPrice } from '../src/game/systems/economy';
 import { SHOPS } from '../src/data/shops';
 import { GIFT_POINTS, giftReaction } from '../src/game/systems/relations';
 import { npcDef } from '../src/data/npcs';
+import { marketValue, reactTo } from '../src/game/systems/playershop';
+import { auctionValue, minBid } from '../src/game/systems/auction';
 import type { Hitbox } from '../src/game/combat/combat';
 import { BrazierPuzzle, DartTrap, FireGrate, PlatePuzzle, PressurePlate, PuzzleBrazier, RuneTrap, SealedChest, SpikeTrap } from '../src/game/entities/traps';
 
@@ -344,5 +346,103 @@ describe('Праздники', () => {
     g.giveGift(target, g.state.inventory.findIndex((s) => s?.def === 'apple'));
     const gained = npcState(g.state, target).points - p0;
     expect(gained).toBe(GIFT_POINTS[giftReaction(npcDef(target), 'apple')] * 3);
+  });
+});
+
+describe('Своя лавка', () => {
+  it('реакции по цене', () => {
+    expect(reactTo(80, 100, 1)).toBe('cheap');
+    expect(reactTo(100, 100, 1)).toBe('fair');
+    expect(reactTo(120, 100, 1)).toBe('pricey');
+    expect(reactTo(200, 100, 1)).toBe('robbery');
+  });
+
+  const shopGame = (seed: number) => {
+    const g = Game.newGame('T', seed);
+    g.state.manor.upgrades.push('hall', 'shop');
+    g.state.time.minutes = 10 * 60;
+    g.goTo({ kind: 'interior', id: 'ashshop' });
+    run(g, 1);
+    return g;
+  };
+
+  it('покупатели покупают по честной цене', () => {
+    const g = shopGame(81);
+    g.give('iron_bar', 10);
+    for (let i = 0; i < 3; i++) g.give('potion_heal', 1);
+    const bar = g.state.inventory.findIndex((s) => s?.def === 'iron_bar');
+    g.placeOnDisplay(0, bar);
+    const d = g.state.shop.displays[0]!;
+    g.setDisplayPrice(0, Math.round(marketValue(g.state, d.stack) * 0.9));
+    const gold0 = g.state.hero.gold;
+    g.toggleShop();
+    expect(g.shopOpen).toBe(true);
+    run(g, 60);
+    expect(g.state.shop.sales).toBeGreaterThan(0);
+    expect(g.state.hero.gold).toBeGreaterThan(gold0);
+    expect(g.state.shop.book.iron_bar?.ok).toBeGreaterThan(0);
+  });
+
+  it('грабительская цена отпугивает и роняет популярность', () => {
+    const g = shopGame(82);
+    g.give('iron_bar', 10);
+    g.placeOnDisplay(0, g.state.inventory.findIndex((s) => s?.def === 'iron_bar'));
+    const d = g.state.shop.displays[0]!;
+    g.setDisplayPrice(0, marketValue(g.state, d.stack) * 5);
+    const pop0 = g.state.shop.popularity;
+    g.toggleShop();
+    run(g, 40);
+    expect(g.state.shop.sales).toBe(0);
+    expect(g.state.shop.popularity).toBeLessThan(pop0);
+  });
+
+  it('вне часов работы лавка не открывается', () => {
+    const g = shopGame(83);
+    g.state.time.minutes = 18 * 60;
+    g.toggleShop();
+    expect(g.shopOpen).toBe(false);
+  });
+});
+
+describe('Аукцион', () => {
+  it('утренние лоты, выкуп и ставка', () => {
+    const g = Game.newGame('T', 91);
+    g.state.hero.gold = 100000;
+    g.openAuction();
+    const a = g.state.auction;
+    expect(a.lots.length).toBeGreaterThanOrEqual(5);
+    expect(a.lots.length).toBeLessThanOrEqual(15);
+    const lot = a.lots[0]!;
+    const gold0 = g.state.hero.gold;
+    expect(g.auctionBuyout(lot.id)).toBe(true);
+    expect(g.state.hero.gold).toBe(gold0 - lot.buyout);
+    const other = a.lots[0]!;
+    expect(g.auctionBid(other.id, minBid(other))).toBe(true);
+    expect(other.mine).toBeGreaterThan(0);
+  });
+
+  it('свой лот: залог, продажа за ночь с комиссией или возврат на почту', () => {
+    const g = Game.newGame('T', 92);
+    g.state.hero.gold = 1000;
+    g.give('iron_bar', 5);
+    const idx = g.state.inventory.findIndex((s) => s?.def === 'iron_bar');
+    const v = auctionValue(g.state.inventory[idx]!);
+    // дёшево с выкупом — почти наверняка уйдёт
+    expect(g.auctionList(idx, Math.round(v * 0.5), Math.round(v * 0.6), 1)).toBe(true);
+    expect(g.state.hero.gold).toBeLessThan(1000);
+    g.give('copper_bar', 5);
+    const idx2 = g.state.inventory.findIndex((s) => s?.def === 'copper_bar');
+    const v2 = auctionValue(g.state.inventory[idx2]!);
+    // грабёж без выкупа — скорее всего вернётся
+    expect(g.auctionList(idx2, v2 * 20, 0, 1)).toBe(true);
+    const gold1 = g.state.hero.gold;
+    g.sleep();
+    run(g, 1);
+    const a = g.state.auction;
+    expect(a.mine.length).toBe(0);
+    expect(g.state.hero.gold).toBeGreaterThan(gold1);
+    expect(a.mail.some((s) => s.def === 'copper_bar')).toBe(true);
+    g.auctionCollect();
+    expect(a.mail.length).toBe(0);
   });
 });

@@ -75,6 +75,10 @@ export interface GameState {
   talents: string[];
   /** Текущий праздник: что уже сделано, чей шёпот услышан, адресат тайного дарителя. */
   fest: { key: string; target: string | null; heard: string[]; done: string[] };
+  /** Своя лавка в усадьбе. */
+  shop: import('./systems/playershop').ShopState;
+  /** Офлайн-аукцион «Золотые весы». */
+  auction: import('./systems/auction').AuctionState;
   /** Где герой находится (для загрузки). Подземелье не сохраняется — загрузка у склепа. */
   location: { scene: SceneRef; x: number; y: number };
   playtime: number;
@@ -103,7 +107,7 @@ export interface QuestState {
   base: number;
 }
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const INVENTORY_SIZE = 36;
 export const STORAGE_SIZE = 36;
 export const QUICK_SLOTS = 4;
@@ -139,6 +143,8 @@ export function newGameState(name: string, seed: number): GameState {
     romance: { partner: null, stage: null, weddingDay: 0 },
     talents: [],
     fest: { key: '', target: null, heard: [], done: [] },
+    shop: { displays: new Array(8).fill(null), popularity: 10, book: {}, sales: 0, income: 0 },
+    auction: { lots: [], mine: [], mail: [], history: {}, day: 0 },
     location: { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 },
     playtime: 0,
     settings: { lang: 'ru', volume: 0.6, shake: true },

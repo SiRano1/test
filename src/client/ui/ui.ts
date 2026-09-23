@@ -12,6 +12,8 @@ import { UPGRADES } from '../../data/manor';
 import { QUESTS } from '../../data/quests';
 import { NPCS } from '../../data/npcs';
 import { REACTION_LABEL } from '../../game/systems/relations';
+import { marketValue } from '../../game/systems/playershop';
+import { auctionValue, COMMISSION, DEPOSIT, median, minBid, sellerName } from '../../game/systems/auction';
 import { hearts } from '../../game/state';
 import { countItem } from '../../game/systems/inventory';
 import { rotatingPrice } from '../../game/systems/economy';
@@ -129,6 +131,7 @@ export class Ui {
         this.renderQuick();
         if (this.menuOpen) this.renderMenu();
         if (game.mode === 'shop') this.renderShop();
+        if (game.mode === 'shopfront' || game.mode === 'auction') this.renderPanel();
       }),
       ev.on('lore', () => this.renderLore()),
       ev.on('elevator', () => this.renderElevator()),
@@ -761,7 +764,7 @@ export class Ui {
   private renderPanel(): void {
     const g = this.game!;
     const m = g.mode;
-    if (m !== 'craft' && m !== 'storage' && m !== 'build' && m !== 'service') {
+    if (m !== 'craft' && m !== 'storage' && m !== 'build' && m !== 'service' && m !== 'shopfront' && m !== 'auction') {
       show(this.panelEl, false);
       this.serviceSel = null;
       return;
@@ -775,6 +778,8 @@ export class Ui {
     if (m === 'craft') this.renderCraft(g, head);
     else if (m === 'storage') this.renderStorage(g, head);
     else if (m === 'build') this.renderBuild(g, head);
+    else if (m === 'shopfront') this.renderShopfront(g, head);
+    else if (m === 'auction') this.renderAuction(g, head);
     else this.renderService(g, head);
     show(this.panelEl, true);
   }
@@ -864,6 +869,158 @@ export class Ui {
       } else detail.append(h('div', { class: 'sub' }, t(L('С этой вещью это сделать нельзя.', "This can't be done to this item."))));
     } else detail.append(h('div', { class: 'sub' }, t(L('Выберите вещь.', 'Choose an item.'))));
     this.panelEl.append(head(tr(kind)), h('div', { style: 'display:flex;flex-direction:column;gap:4px' }, grid, detail));
+  }
+
+  // ───────────────────────── Своя лавка ─────────────────────────
+
+  private renderShopfront(g: Game, head: (t: string) => HTMLElement): void {
+    const s = g.state, sh = s.shop;
+    const sel = g.shopfrontSel;
+    const displays = h('div', { class: 'grid', style: 'grid-template-columns:repeat(4,34px);gap:3px' });
+    sh.displays.forEach((d, i) => {
+      const slot = this.slotEl(d?.stack ?? null, { sel: i === sel, label: d ? undefined : '—', onclick: () => ((g.shopfrontSel = i), this.renderPanel()) });
+      slot.style.width = slot.style.height = '22px';
+      displays.append(h('div', { class: 'col', style: 'align-items:center;gap:1px' }, slot, h('span', { class: 'num gold-text', style: 'font-size:5px' }, d ? String(d.price) : '')));
+    });
+    const detail = h('div', { class: 'detail', style: 'flex:1' });
+    const d = sh.displays[sel];
+    if (d) {
+      this.fillDetail(detail, d.stack, g, undefined, true);
+      const market = marketValue(s, d.stack);
+      const book = sh.book[d.stack.def];
+      const step = (k: number) => h('button', { onclick: () => { g.setDisplayPrice(sel, k > -1 && k < 1 ? d.price * (1 + k) : d.price + k); this.renderPanel(); } }, k > -1 && k < 1 ? `${k > 0 ? '+' : ''}${Math.round(k * 100)}%` : `${k > 0 ? '+' : ''}${k}`);
+      detail.append(
+        h('div', { class: 'row', style: 'justify-content:flex-start;gap:3px;margin-top:3px' },
+          step(-0.1), step(-1), h('b', { class: 'num gold-text', style: 'min-width:38px;text-align:center' }, `◆${d.price}`), step(1), step(0.1)),
+        h('div', { class: 'sub' }, `${t(L('Рыночная цена', 'Market value'))}: ◆${market}${d.stack.qty > 1 ? ` · ×${d.stack.qty}` : ''}`),
+        h('div', { class: 'sub' }, `${t(L('Книга цен', 'Price book'))}: ${book ? `${book.ok ? `✓ ≤ ${book.ok}` : ''}${book.ok && book.high ? ' · ' : ''}${book.high ? `… ≥ ${book.high}` : ''}` : t(L('ещё нет записей', 'no entries yet'))}`),
+        h('div', { class: 'actions' }, h('button', { onclick: () => { g.takeFromDisplay(sel); this.renderPanel(); } }, t(L('Убрать с витрины', 'Take off display')))));
+    } else detail.append(h('div', { class: 'sub' }, t(L('Пустая витрина. Выберите вещь из рюкзака ниже.', 'Empty display. Pick an item from your backpack below.'))));
+    const inv = h('div', { class: 'grid' });
+    s.inventory.forEach((st, i) => inv.append(this.slotEl(st, { onclick: () => { if (st) g.placeOnDisplay(sel, i); this.renderPanel(); } })));
+    const inShop = g.scene.kind === 'interior' && g.scene.id === 'ashshop';
+    const status = h('div', { class: 'row', style: 'justify-content:flex-start;gap:6px;margin-top:3px' },
+      h('span', null, t(L('Популярность', 'Popularity'))),
+      h('div', { class: 'bar', style: 'width:80px;height:4px' }, h('i', { style: `background:#ff8ab0;transform:scaleX(${sh.popularity / 100})` })),
+      h('span', { class: 'sub num' }, `${t(L('Продано', 'Sold'))}: ${sh.sales} · ◆${sh.income}`),
+      h('span', { style: 'flex:1' }),
+      inShop
+        ? h('button', { onclick: () => { g.toggleShop(); g.closePanel(); } }, g.shopOpen ? t(L('Закрыть лавку', 'Close the shop')) : t(L('Открыть двери (9:00–17:00)', 'Open the doors (9:00–17:00)')))
+        : h('span', { class: 'sub' }, t(L('Открыть лавку можно в торговом зале', 'You can open the shop from the shop floor'))));
+    this.panelEl.append(head(t(L('Лавка Эшгроув', 'Ashgrove Shop'))),
+      h('div', { style: 'display:flex;gap:8px' }, displays, detail),
+      h('div', { class: 'sub', style: 'color:var(--ink-dim);margin-top:3px' }, tr('inventoryShort')), inv, status,
+      h('div', { class: 'help' }, t(L('♥♥ — дёшево, ✓ — честно, … — дорого (купят через раз), ✗ — грабёж (уйдут и расскажут соседям).', '♥♥ cheap, ✓ fair, … pricey (buy half the time), ✗ robbery (they leave and tell the neighbours).'))));
+  }
+
+  // ───────────────────────── Аукцион ─────────────────────────
+
+  private aucTab: 'lots' | 'mine' | 'mail' = 'lots';
+  private aucSel: string | null = null;
+  private aucBid = 0;
+  private aucInv: number | null = null;
+  private aucStart = 0;
+  private aucBuyout = 0;
+  private aucDays: 1 | 2 | 3 = 2;
+
+  private sparkline(values: number[]): HTMLElement {
+    const box = h('div', { class: 'spark' });
+    if (values.length < 2) {
+      box.append(h('span', { class: 'sub' }, t(L('история цен появится через пару дней', 'price history appears after a couple of days'))));
+      return box;
+    }
+    const W = 120, H = 24, lo = Math.min(...values), hi = Math.max(...values), span = Math.max(1, hi - lo);
+    const pts = values.map((v, i) => `${((i / (values.length - 1)) * (W - 4) + 2).toFixed(1)},${(H - 3 - ((v - lo) / span) * (H - 6)).toFixed(1)}`).join(' ');
+    box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}"><polyline points="${pts}" fill="none" stroke="var(--gold)" stroke-width="1"/></svg>`;
+    box.append(h('span', { class: 'sub num' }, `${t(L('медиана', 'median'))} ◆${median(values)} · ${lo}–${hi}`));
+    return box;
+  }
+
+  private renderAuction(g: Game, head: (t: string) => HTMLElement): void {
+    const a = g.state.auction;
+    const lang = getLang();
+    const days = (ends: number) => {
+      const n = ends - g.state.time.totalDays;
+      return n <= 0 ? t(L('до полуночи', 'until midnight')) : t(L(`ещё ${n + 1} дн.`, `${n + 1} days`));
+    };
+    const tabs = h('div', { class: 'tabs', style: 'padding:0;margin-bottom:3px' });
+    for (const [id, name] of [['lots', L('Лоты', 'Lots')], ['mine', L('Мои лоты', 'My lots')], ['mail', L(`Почта (${a.mail.length})`, `Mail (${a.mail.length})`)]] as const)
+      tabs.append(h('button', { class: this.aucTab === id ? 'on' : '', onclick: () => ((this.aucTab = id), this.renderPanel()) }, t(name)));
+    const body = h('div', { style: 'display:flex;gap:6px;flex:1;min-height:0' });
+
+    if (this.aucTab === 'lots') {
+      const list = h('div', { class: 'shop-list', style: 'flex:1;overflow-y:auto' });
+      for (const lot of a.lots) {
+        list.append(h('div', { class: `shop-row ${this.aucSel === lot.id ? 'sel' : ''}`, style: this.aucSel === lot.id ? 'background:var(--panel-2)' : '', onclick: () => ((this.aucSel = lot.id), (this.aucBid = minBid(lot)), this.renderPanel()) },
+          h('img', { src: this.renderer.bank.iconUrl(lot.stack.def) }),
+          h('span', { class: `nm r${lot.stack.rarity}`, style: 'flex:1' }, `${itemName(lot.stack)}${lot.stack.qty > 1 ? ` ×${lot.stack.qty}` : ''}${lot.mine ? ' ★' : ''}`),
+          h('span', { class: 'sub', style: 'font-size:6px;width:52px' }, days(lot.ends)),
+          h('span', { class: 'num', style: 'width:38px;text-align:right' }, `${lot.bid}`),
+          h('span', { class: 'pr num' }, `◆${lot.buyout}`)));
+      }
+      const detail = h('div', { class: 'detail', style: 'width:170px;flex:none' });
+      const lot = a.lots.find((l) => l.id === this.aucSel);
+      if (lot) {
+        this.fillDetail(detail, lot.stack, g, undefined, true);
+        detail.append(h('div', { class: 'sub' }, `${t(L('Продавец', 'Seller'))}: ${sellerName(lot, lang)}`));
+        detail.append(this.sparkline(a.history[lot.stack.def] ?? []));
+        const bid = Math.max(this.aucBid, minBid(lot));
+        const step = (k: number) => h('button', { onclick: () => ((this.aucBid = Math.max(minBid(lot), Math.round(bid * (1 + k)))), this.renderPanel()) }, `${k > 0 ? '+' : ''}${Math.round(k * 100)}%`);
+        detail.append(
+          h('div', { class: 'row', style: 'justify-content:flex-start;gap:2px;margin-top:3px' }, step(-0.05), h('b', { class: 'num gold-text' }, `◆${bid}`), step(0.05)),
+          h('div', { class: 'actions' },
+            h('button', { disabled: bid >= lot.buyout ? true : undefined, onclick: () => { g.auctionBid(lot.id, bid); this.renderPanel(); } }, t(L('Ставка', 'Bid'))),
+            h('button', { onclick: () => { if (g.auctionBuyout(lot.id)) this.aucSel = null; this.renderPanel(); } }, `${t(L('Выкупить', 'Buy out'))} ◆${lot.buyout - lot.mine}`)),
+          h('div', { class: 'help' }, t(L('Ставки решаются в полночь. Если перебьют — золото вернётся.', 'Bids resolve at midnight. If outbid, your gold comes back.'))));
+      } else detail.append(h('div', { class: 'sub' }, t(L('Каждое утро — новые лоты из Альтенбурга.', 'Fresh lots from Altenburg every morning.'))));
+      body.append(list, detail);
+    } else if (this.aucTab === 'mine') {
+      const left = h('div', { class: 'col', style: 'flex:1;overflow-y:auto' });
+      if (!a.mine.length) left.append(h('div', { class: 'sub' }, t(L('Нет выставленных лотов.', 'No lots listed.'))));
+      for (const lot of a.mine)
+        left.append(h('div', { class: 'shop-row' },
+          h('img', { src: this.renderer.bank.iconUrl(lot.stack.def) }),
+          h('span', { class: `nm r${lot.stack.rarity}`, style: 'flex:1' }, `${itemName(lot.stack)}${lot.stack.qty > 1 ? ` ×${lot.stack.qty}` : ''}`),
+          h('span', { class: 'sub', style: 'font-size:6px' }, `${days(lot.ends)} · ${t(L('ставок', 'bids'))}: ${lot.bids}`),
+          h('span', { class: 'num', style: 'width:40px;text-align:right' }, `${lot.bid || lot.start}`),
+          h('button', { disabled: lot.bids > 0 ? true : undefined, onclick: () => { g.auctionCancel(lot.id); this.renderPanel(); } }, '✕')));
+      const inv = h('div', { class: 'grid' });
+      g.state.inventory.forEach((st, i) => inv.append(this.slotEl(st, { sel: this.aucInv === i, onclick: () => {
+        if (!st) return;
+        this.aucInv = i;
+        const v = auctionValue(st);
+        this.aucStart = Math.round(v * 0.8);
+        this.aucBuyout = Math.round(v * 1.25);
+        this.renderPanel();
+      } })));
+      const form = h('div', { class: 'detail', style: 'min-height:0' });
+      const st = this.aucInv !== null ? g.state.inventory[this.aucInv] : null;
+      if (st) {
+        const adj = (which: 'start' | 'buyout', k: number) => h('button', { onclick: () => {
+          if (which === 'start') this.aucStart = Math.max(1, Math.round(this.aucStart * (1 + k)));
+          else this.aucBuyout = Math.max(this.aucStart, Math.round(this.aucBuyout * (1 + k)));
+          this.renderPanel();
+        } }, k > 0 ? '+' : '−');
+        const deposit = Math.max(1, Math.ceil(this.aucStart * DEPOSIT));
+        form.append(
+          h('div', { class: `t r${st.rarity}` }, `${itemName(st)}${st.qty > 1 ? ` ×${st.qty}` : ''}`),
+          this.sparkline(a.history[st.def] ?? []),
+          h('div', { class: 'row', style: 'justify-content:flex-start;gap:3px' }, t(L('Старт', 'Start')), adj('start', -0.1), h('b', { class: 'num gold-text' }, `◆${this.aucStart}`), adj('start', 0.1),
+            h('span', { style: 'width:8px' }), t(L('Выкуп', 'Buyout')), adj('buyout', -0.1), h('b', { class: 'num gold-text' }, `◆${this.aucBuyout}`), adj('buyout', 0.1)),
+          h('div', { class: 'row', style: 'justify-content:flex-start;gap:3px' },
+            ...([1, 2, 3] as const).map((n) => h('button', { class: this.aucDays === n ? 'on' : '', style: this.aucDays === n ? 'color:var(--gold)' : '', onclick: () => ((this.aucDays = n), this.renderPanel()) }, t(L(`${n} дн.`, `${n} d`)))),
+            h('span', { class: 'sub' }, `${t(L('Залог', 'Deposit'))} ◆${deposit} · ${t(L('комиссия', 'fee'))} ${Math.round(COMMISSION * 100)}%`),
+            h('button', { onclick: () => { if (g.auctionList(this.aucInv!, this.aucStart, this.aucBuyout, this.aucDays)) this.aucInv = null; this.renderPanel(); } }, t(L('Выставить', 'List')))));
+      } else form.append(h('div', { class: 'sub' }, t(L('Выберите вещь из рюкзака, чтобы выставить её на торги (до 6 лотов).', 'Pick an item from your backpack to put it up for auction (up to 6 lots).'))));
+      body.append(h('div', { class: 'col', style: 'flex:1;min-width:0;gap:3px' }, left, form), h('div', { class: 'col' }, h('div', { class: 'sub' }, tr('inventoryShort')), inv));
+    } else {
+      const list = h('div', { class: 'col', style: 'flex:1' });
+      if (!a.mail.length) list.append(h('div', { class: 'sub' }, t(L('Почта пуста.', 'No mail.'))));
+      for (const st of a.mail) list.append(h('div', { class: 'shop-row' }, h('img', { src: this.renderer.bank.iconUrl(st.def) }), h('span', { class: `nm r${st.rarity}` }, `${itemName(st)}${st.qty > 1 ? ` ×${st.qty}` : ''}`)));
+      if (a.mail.length) list.append(h('button', { style: 'align-self:flex-start', onclick: () => { g.auctionCollect(); this.renderPanel(); } }, t(L('Забрать всё', 'Collect all'))));
+      body.append(list);
+    }
+    this.panelEl.append(head(t(L('Аукцион «Золотые весы»', 'The Golden Scales Auction'))), tabs, body);
   }
 
   // ───────────────────────── Подарки ─────────────────────────
@@ -1056,7 +1213,7 @@ export class Ui {
       if (c === 'Escape') {
         consumed = true;
         if (!this.giftEl.classList.contains('hidden')) show(this.giftEl, false);
-        else if (g.mode === 'craft' || g.mode === 'storage' || g.mode === 'build' || g.mode === 'service') g.closePanel();
+        else if (g.mode === 'craft' || g.mode === 'storage' || g.mode === 'build' || g.mode === 'service' || g.mode === 'shopfront' || g.mode === 'auction') g.closePanel();
         else if (this.menuOpen) this.toggleMenu();
         else if (g.mode === 'shop') g.closeShop();
         else if (g.mode === 'lore') g.closeLore();

@@ -8,6 +8,8 @@ export interface ShopItem {
   deepest?: number;
   /** Только в эти сезоны. */
   seasons?: number[];
+  /** Нужна репутация фракции. */
+  rep?: ['church' | 'mages' | 'traders' | 'watch', number];
 }
 
 export interface ShopDef {
@@ -74,7 +76,7 @@ export const SHOPS: Record<string, ShopDef> = {
   },
   trading: {
     id: 'trading', npc: 'livia', name: L('Торговый дом Кроу', 'House of Crowe'), sellMul: 1.05,
-    stock: [{ item: 'oath_amulet' }, { item: 'silver_ribbon' }, { item: 'glass' }, { item: 'potion_big', deepest: 30 }, { item: 'steel_bar', deepest: 21 }, { item: 'silver_bar', deepest: 31 }],
+    stock: [{ item: 'trade_license', rep: ['traders', 10] }, { item: 'oath_amulet' }, { item: 'silver_ribbon' }, { item: 'glass' }, { item: 'potion_big', deepest: 30 }, { item: 'steel_bar', deepest: 21 }, { item: 'silver_bar', deepest: 31 }],
     buys: (d) => tagged(d, 'gem', 'bar') || d.kind === 'accessory',
   },
   fair: {

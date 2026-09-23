@@ -9,6 +9,7 @@ import { Pickup } from '../../game/entities/pickup';
 import { Player } from '../../game/entities/player';
 import { Projectile } from '../../game/entities/projectile';
 import { CrackedWall, GardenPlot, Prop, Spot, Trigger } from '../../game/entities/props';
+import { DisplayStand } from '../../game/entities/customer';
 import { CROPS } from '../../data/items';
 import { Companion } from '../../game/entities/companion';
 import { growthStage } from '../../game/systems/garden';
@@ -303,6 +304,20 @@ export class Renderer {
     if (e instanceof CrackedWall) {
       const art = this.bank.prop('cracked');
       if (art) this.blit(art.frames[0]!, x, y, art.ax, art.ay, false, e.flash);
+      return;
+    }
+    if (e instanceof DisplayStand) {
+      const art = this.bank.prop(e.sprite);
+      if (art) this.blit(art.frames[0]!, x, y, art.ax, art.ay, false, e.flash);
+      const d = w.game.state.shop.displays[e.index];
+      if (d) {
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.translate(Math.round(x), Math.round(y - 20 + Math.sin(this.time * 2 + e.index) * 0.8));
+        ctx.scale(0.75, 0.75);
+        ctx.drawImage(this.bank.icon(d.stack.def), -8, -8);
+        ctx.restore();
+      }
       return;
     }
     if (e instanceof Prop) {

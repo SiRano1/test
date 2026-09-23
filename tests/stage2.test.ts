@@ -161,10 +161,12 @@ describe('Ярус II', () => {
 });
 
 describe('Миграция сохранений', () => {
-  it('v1 → v2 добавляет новые поля', () => {
+  it('v1 → текущая добавляет новые поля', () => {
     const old = { version: 1, hero: { name: 'A' }, economy: { demand: { bone: 0.5 } }, flags: {}, stats: {} };
     const m = migrate(old);
-    expect(m.version).toBe(2);
+    expect(m.version).toBe(3);
+    expect(m.shop.displays).toHaveLength(8);
+    expect(m.auction.lots).toEqual([]);
     expect(m.manor.upgrades).toEqual([]);
     expect(m.economy.demand.bone).toBe(0.5);
     expect(m.quests).toEqual({});

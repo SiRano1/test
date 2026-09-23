@@ -25,6 +25,9 @@ import { itemName, makeItem } from './systems/loot';
 import { classLevel, computeStats, xpToNext, type Buff } from './systems/stats';
 import { learnTalent, resetTalents, talentPoints } from './systems/talents';
 import { Festivals } from './systems/festivals';
+import { auctionNight, buyout, cancelLot, collectMail, ensureLots, listItem, placeBid } from './systems/auction';
+import { isShopHours, marketValue } from './systems/playershop';
+import { ShopFloor } from './entities/customer';
 import { festivalToday } from '../data/festivals';
 import { bedSpawn, buildInterior, infirmarySpawn, interiorEntry } from './town/interiors';
 import { buildTown, doorSpawn } from './town/town';
@@ -227,6 +230,7 @@ export class Game implements GameApi, DialogueHost {
   private swapWorld(ref: SceneRef, spawn?: SpawnSpec): void {
     this.syncHero();
     this.fest.onSceneChange();
+    this.shopOpen = false;
     const prevKind = this.scene.kind;
     let world: World;
     let sp: SpawnSpec | undefined = spawn;
@@ -525,6 +529,16 @@ export class Game implements GameApi, DialogueHost {
     this.state.companion = null;
     advanceDay(this.state);
     dailyEconomy(this.state);
+    const night = auctionNight(this.state);
+    if (night.sold.length || night.won.length || night.outbid || night.returned) {
+      const gold = night.sold.reduce((n, x) => n + Math.round(x.price * 0.9), 0);
+      const parts: string[] = [];
+      if (night.sold.length) parts.push(t(L(`продано лотов: ${night.sold.length} (+${gold} з.)`, `lots sold: ${night.sold.length} (+${gold} g)`)));
+      if (night.won.length) parts.push(t(L(`выиграно: ${night.won.length}`, `won: ${night.won.length}`)));
+      if (night.outbid) parts.push(t(L(`ставку перебили: ${night.outbid}`, `outbid: ${night.outbid}`)));
+      if (night.returned) parts.push(t(L(`не продано: ${night.returned}`, `unsold: ${night.returned}`)));
+      setTimeout(() => this.toast(`${t(L('Аукцион', 'Auction'))}: ${parts.join(', ')}`, '#ffd040'), 3000);
+    }
     const withered = growNight(this.state, rained, this.state.time.season);
     if (withered) this.toast(tr('withered', { n: withered }), '#c0a080');
     // романтика: свадьба и утренние хлопоты супруга
@@ -1392,8 +1406,108 @@ export class Game implements GameApi, DialogueHost {
   }
 
   openAuction(): void {
+    ensureLots(this.state);
     this.mode = 'auction';
     this.events.emit('panel', { kind: 'auction' });
+  }
+
+  auctionBuyout(id: string): boolean {
+    const ok = buyout(this.state, id);
+    if (ok) {
+      this.world.fx({ t: 'sfx', id: 'buy' });
+      this.events.emit('inventory', undefined);
+    } else this.toast(tr('notEnoughGold'), '#ff8080');
+    return ok;
+  }
+
+  auctionBid(id: string, amount: number): boolean {
+    const ok = placeBid(this.state, id, amount);
+    if (ok) this.world.fx({ t: 'sfx', id: 'ui' });
+    else this.toast(tr('notEnoughGold'), '#ff8080');
+    return ok;
+  }
+
+  auctionList(invIndex: number, start: number, buyoutPrice: number, days: 1 | 2 | 3): boolean {
+    const ok = !!listItem(this.state, invIndex, start, buyoutPrice, days);
+    if (ok) {
+      this.world.fx({ t: 'sfx', id: 'equip' });
+      this.events.emit('inventory', undefined);
+    }
+    return ok;
+  }
+
+  auctionCancel(id: string): boolean {
+    return cancelLot(this.state, id);
+  }
+
+  auctionCollect(): number {
+    const n = collectMail(this.state);
+    if (n) this.events.emit('inventory', undefined);
+    return n;
+  }
+
+  // ───────────────────────── Своя лавка ─────────────────────────
+
+  /** Открыта ли лавка для покупателей (только пока герой в торговом зале). */
+  shopOpen = false;
+  shopfrontSel = 0;
+
+  openShopfront(index?: number): void {
+    if (index !== undefined) this.shopfrontSel = index;
+    this.mode = 'shopfront';
+    this.events.emit('panel', { kind: 'shopfront' });
+  }
+
+  /** Выставить стопку из рюкзака на витрину (прежняя возвращается в рюкзак). */
+  placeOnDisplay(slot: number, invIndex: number): boolean {
+    const sh = this.state.shop;
+    const st = this.state.inventory[invIndex];
+    if (!st || itemDef(st.def).kind === 'quest') return false;
+    const prev = sh.displays[slot];
+    this.state.inventory[invIndex] = prev ? prev.stack : null;
+    const book = sh.book[st.def];
+    sh.displays[slot] = { stack: st, price: book?.ok || marketValue(this.state, st) };
+    this.events.emit('inventory', undefined);
+    return true;
+  }
+
+  takeFromDisplay(slot: number): boolean {
+    const d = this.state.shop.displays[slot];
+    if (!d) return false;
+    const q = d.stack.qty;
+    addToContainer(this.state.inventory, d.stack);
+    if (d.stack.qty > 0) {
+      if (d.stack.qty === q) this.toast(tr('inventoryFull'), '#ff8080');
+      return false;
+    }
+    this.state.shop.displays[slot] = null;
+    this.events.emit('inventory', undefined);
+    return true;
+  }
+
+  setDisplayPrice(slot: number, price: number): void {
+    const d = this.state.shop.displays[slot];
+    if (d) d.price = Math.max(1, Math.min(999999, Math.round(price)));
+  }
+
+  toggleShop(): void {
+    if (this.shopOpen) {
+      this.shopOpen = false;
+      return;
+    }
+    if (!(this.scene.kind === 'interior' && this.scene.id === 'ashshop')) return;
+    if (!isShopHours(this.state)) {
+      this.toast(t(L('Лавка работает с 9:00 до 17:00', 'The shop is open 9:00–17:00')), '#ffd080');
+      return;
+    }
+    if (this.fest.today()) {
+      this.toast(t(L('Сегодня праздник — весь город на площади', 'It is a festival — the whole town is on the plaza')), '#ffd080');
+      return;
+    }
+    this.shopOpen = true;
+    const floor = this.world.entities.find((e): e is ShopFloor => e instanceof ShopFloor);
+    floor?.startDay(this.state.shop.income);
+    this.world.fx({ t: 'sfx', id: 'door' });
   }
 
   itemExists(def: string): boolean {

@@ -54,6 +54,6 @@ export function dailyEconomy(s: GameState): void {
 export function shopStock(s: GameState, shopId: string): string[] {
   const shop = SHOPS[shopId]!;
   return shop.stock
-    .filter((i) => (i.deepest ?? 0) <= s.dungeon.deepest && (!i.seasons || i.seasons.includes(s.time.season)))
+    .filter((i) => (i.deepest ?? 0) <= s.dungeon.deepest && (!i.seasons || i.seasons.includes(s.time.season)) && (!i.rep || s.factions[i.rep[0]] >= i.rep[1]))
     .map((i) => i.item);
 }

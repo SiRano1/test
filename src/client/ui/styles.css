@@ -848,3 +848,15 @@ button.tal.locked {
 button.tal.sel {
   box-shadow: 0 0 0 1px var(--ink);
 }
+
+/* ── Аукцион ── */
+.spark {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 3px;
+}
+.spark svg {
+  background: #140e14;
+  border: 1px solid #3a2a34;
+}

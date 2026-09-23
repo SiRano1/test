@@ -4,6 +4,8 @@ import { Tile, TileMap } from '../../core/tilemap';
 import type { Station } from '../../data/recipes';
 import { tr } from '../../data/strings';
 import { door, Prop, Spot } from '../entities/props';
+import { DisplayStand, SHOP_COUNTER, SHOP_H, SHOP_W, ShopFloor } from '../entities/customer';
+import { L, t } from '../../data/loc';
 import type { GameState } from '../state';
 import { World, type GameApi, type SpawnSpec } from '../world';
 import { doorSpawn } from './town';
@@ -33,6 +35,19 @@ interface InteriorSpec {
 const candle = (x: number, y: number): Furniture => ({ x, y, sprite: 'candle_stand', block: true, light: { r: 40, color: '#ffd080', flicker: 0.1 } });
 
 const INTERIORS: Record<string, InteriorSpec> = {
+  ashshop: {
+    w: SHOP_W, h: SHOP_H, floor: Tile.WOOD, darkness: 0.2,
+    furniture: [
+      { x: 1, y: 2, sprite: 'shelf_food', w: 2, block: true },
+      { x: 3, y: 2, sprite: 'bookshelf', block: true },
+      { x: 10, y: 2, sprite: 'weapon_rack', w: 2, block: true },
+      { x: 12, y: 2, sprite: 'armor_stand', block: true },
+      { x: 5, y: 5, sprite: 'rug', w: 4, h: 3 },
+      candle(9, 2),
+      { x: 1, y: 8, sprite: 'barrel', block: true },
+      { x: 12, y: 8, sprite: 'crate', block: true },
+    ],
+  },
   manor: {
     w: 16, h: 11, floor: Tile.WOOD, darkness: 0.35,
     furniture: [
@@ -178,6 +193,7 @@ function manorFurniture(s: GameState): Furniture[] {
     );
   }
   if (up.has('lab')) f.push({ x: 1, y: 6, sprite: 'alchemy_table', w: 2, block: true, station: 'alchemy', light: { r: 34, color: '#80ff90', flicker: 0.2 } });
+  if (up.has('shop')) f.push({ x: 14, y: 9, sprite: 'shopdoor' });
   return f;
 }
 
@@ -249,6 +265,21 @@ export function buildInterior(game: GameApi, id: string): World {
     p.blockRect(c.x, c.y, c.w, 1);
     p.interaction = { label: () => tr('trade'), range: 10, act: (ww) => ww.game.counter(c.npc) };
     w.addNow(p);
+  }
+  if (id === 'ashshop') {
+    // прилавок героя, витрины и распорядитель покупателей; дверь ведёт обратно в усадьбу
+    const c = SHOP_COUNTER;
+    const p = new Prop((c.x + c.w / 2) * TILE, (c.y + 1) * TILE, `furn:counter:${c.w}x1`, { hw: (c.w * TILE) / 2, hh: 3 });
+    p.blockRect(c.x, c.y, c.w, 1);
+    p.interaction = { label: () => t(L('Управлять лавкой', 'Manage the shop')), range: 12, act: (ww) => ww.game.openShopfront() };
+    w.addNow(p);
+    for (let i = 0; i < 8; i++) w.addNow(new DisplayStand(i));
+    w.addNow(new ShopFloor());
+    w.addNow(door(dx * TILE, (s.h - 1) * TILE + 4, 2 * TILE, 14, { kind: 'interior', id: 'manor' }, { x: 14 * TILE + 8, y: 8 * TILE + 10, facing: 0 }));
+    return w;
+  }
+  if (id === 'manor' && game.state.manor.upgrades.includes('shop')) {
+    w.addNow(new Spot(14 * TILE + 8, 9 * TILE + 12, { label: () => t(L('В лавку', 'To the shop')), range: 10, act: (ww) => ww.game.goTo({ kind: 'interior', id: 'ashshop' }) }, '', 8, 8));
   }
   w.addNow(door(dx * TILE, (s.h - 1) * TILE + 4, 2 * TILE, 14, { kind: 'town' }, doorSpawn(id)));
   return w;

@@ -141,5 +141,18 @@ add({ id: 'founder_spirit', name: L('Дух Основателя', 'Founder\u201
   gifts: g([], []),
   look: { hair: '#d8e8f0', skin: '#b8d0e0', top: '#8aa8c8', bottom: '#6a88a8', accent: '#e0f0ff', style: 'hood', robe: true } });
 
+// ── Приезжие покупатели своей лавки ──
+const VISITOR_LOOKS: Look[] = [
+  { hair: '#3a2a20', skin: '#e0b894', top: '#5a7a4a', bottom: '#4a3a30', accent: '#c8a040', style: 'cap' },
+  { hair: '#c8a060', skin: '#f0d0b0', top: '#8a4a6a', bottom: '#3a3040', accent: '#e0c0d0', style: 'long' },
+  { hair: '#1a1418', skin: '#a07058', top: '#3a5a8a', bottom: '#2a2a3a', accent: '#d8d8e0', style: 'short', beard: true },
+  { hair: '#8a8a90', skin: '#e0c0a0', top: '#7a6a4a', bottom: '#4a4034', accent: '#a08a60', style: 'bald', beard: true },
+  { hair: '#a04020', skin: '#f0c8a8', top: '#c8a040', bottom: '#5a4a30', accent: '#8a3a30', style: 'bun' },
+  { hair: '#4a3020', skin: '#c89878', top: '#4a4a5a', bottom: '#2a2830', accent: '#8a8aa0', style: 'hood', robe: true },
+];
+VISITOR_LOOKS.forEach((look, i) =>
+  add({ id: `visitor_${i}`, name: L('Приезжий', 'Traveller'), role: L('Покупатель', 'Customer'), romance: false, birthday: [0, 1], speakerOnly: true, gifts: g([], []), look }),
+);
+
 /** Облик героя по умолчанию. */
 export const HERO_LOOK: Look = { hair: '#5a3a24', skin: '#f0c8a0', top: '#3a6a4a', bottom: '#4a3a2e', accent: '#c8a060', style: 'short' };

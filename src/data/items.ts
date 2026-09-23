@@ -192,6 +192,7 @@ add({ id: 'leather_feet', kind: 'armor', name: L('Кожаные сапоги', 
 
 // Аксессуары
 add({ id: 'ring', kind: 'accessory', name: L('Кольцо', 'Ring'), icon: { shape: 'ring', c1: '#e0c060', c2: '#8a6a20' }, price: 60, stack: 1, tier: 1, gender: 'n', accessory: { slot: 'ring', stats: { luck: 2 } } });
+add({ id: 'trade_license', kind: 'quest', name: L('Торговая лицензия', 'Trading Licence'), icon: { shape: 'scroll', c1: '#e8d8a8', c2: '#c83a3a' }, price: 800, stack: 1, tier: 1, gender: 'f', desc: L('Печать Торгового дома Кроу: право держать свою лавку в Вальмарке.', 'Seal of the House of Crowe: the right to keep your own shop in Valmark.') });
 add({ id: 'spirit_lantern', kind: 'accessory', name: L('Фонарь духов', 'Spirit Lantern'), icon: { shape: 'amulet', c1: '#c8e8ff', c2: '#6a88c8' }, price: 400, stack: 1, tier: 3, gender: 'm', unique: true, accessory: { slot: 'amulet', stats: { holy: 6, luck: 3 } } });
 add({ id: 'amulet', kind: 'accessory', name: L('Амулет', 'Amulet'), icon: { shape: 'amulet', c1: '#e0c060', c2: '#5aa6ff' }, price: 90, stack: 1, tier: 1, gender: 'm', accessory: { slot: 'amulet', stats: { maxHp: 10 } } });
 

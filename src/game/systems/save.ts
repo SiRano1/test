@@ -47,6 +47,14 @@ const MIGRATIONS: Record<number, (d: any) => any> = {
     recipes: [],
     giftLog: {},
   }),
+  // 2 → 3: этап 3 — таланты, праздники, своя лавка, аукцион, романтика, финалы
+  2: (d) => ({
+    ...d,
+    talents: d.talents ?? [],
+    fest: { key: '', target: null, heard: [], done: [] },
+    shop: { displays: new Array(8).fill(null), popularity: 10, book: {}, sales: 0, income: 0 },
+    auction: { lots: [], mine: [], mail: [], history: {}, day: 0 },
+  }),
 };
 
 export function migrate(data: any): GameState {
@@ -69,6 +77,8 @@ export function migrate(data: any): GameState {
   data.romance ??= { partner: null, stage: null, weddingDay: 0 };
   data.talents ??= [];
   data.fest ??= { key: '', target: null, heard: [], done: [] };
+  data.shop ??= { displays: new Array(8).fill(null), popularity: 10, book: {}, sales: 0, income: 0 };
+  data.auction ??= { lots: [], mine: [], mail: [], history: {}, day: 0 };
   data.flags ??= {};
   data.stats ??= {};
   data.location ??= { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 };

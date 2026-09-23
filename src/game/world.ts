@@ -49,6 +49,9 @@ export interface GameApi {
   plotLabel(index: number): string;
   /** Праздничные украшения города. */
   decorateTown?(w: World): void;
+  /** Своя лавка: открыта ли для покупателей и панель витрин. */
+  shopOpen: boolean;
+  openShopfront(index?: number): void;
 }
 
 /** Интерфейс ломаемых объектов (урны, жилы, треснувшие стены). */

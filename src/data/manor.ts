@@ -29,6 +29,11 @@ export const UPGRADES: UpgradeDef[] = [
   },
 ];
 
+UPGRADES.push({
+  id: 'shop', name: L('Лавка', 'Shop'), cost: 6000, items: [['trade_license', 1], ['wood', 30]], days: 3, requires: ['hall'],
+  desc: L('Торговый зал с восемью витринами: сами назначаете цены, покупатели сами приходят.', 'A shop floor with eight displays: you set the prices, customers come to you.'),
+});
+
 export const UPGRADE_BY_ID: Record<string, UpgradeDef> = Object.fromEntries(UPGRADES.map((u) => [u.id, u]));
 
 /** Координаты грядок (тайлы города) — во дворе усадьбы. */

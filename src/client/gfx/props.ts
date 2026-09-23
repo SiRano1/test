@@ -798,6 +798,14 @@ function furniture(name: string, size: string): Art {
     case 'cot':
       g.rect(1, y0 - 2, W - 2, H - y0, WOOD_S).rect(2, y0 - 1, W - 4, H - y0 - 3, '#e8e8e0').rect(2, y0 - 1, W - 4, 4, '#ffffff');
       break;
+    case 'pedestal':
+      g.rect(2, y0 + 2, W - 4, H - y0 - 2, WOOD_S).rect(1, y0 - 1, W - 2, 4, WOOD_L).rect(1, y0 + 2, W - 2, 1, WOOD_S);
+      g.rect(3, y0 - 2, W - 6, 1, '#8a3a4a').rect(4, H - 3, W - 8, 2, '#3a2418');
+      break;
+    case 'shopdoor':
+      g.rect(1, y0 + 4, W - 2, H - y0 - 6, '#6a3a3a').rect(2, y0 + 5, W - 4, H - y0 - 8, '#8a4a4a');
+      g.rect(5, y0 - 8, 6, 6, '#e8d8a8').rect(6, y0 - 7, 4, 1, '#8a6a3a').rect(6, y0 - 5, 4, 1, '#8a6a3a').rect(7, y0 - 10, 2, 2, WOOD_S);
+      break;
     case 'counter':
       g.rect(0, y0 - 4, W, H - y0 + 4, WOOD).rect(0, y0 - 4, W, 3, WOOD_L).rect(0, H - 3, W, 3, WOOD_S);
       for (let x = 8; x < W; x += 16) g.rect(x, y0, 1, H - y0 - 3, WOOD_S);

@@ -103,6 +103,44 @@ try {
     await fest('06-spirits', 2, 27, 21 * 60, [11, 15]);
     await fest('07-feast', 3, 25, 19 * 60, [31, 19]);
   }
+  if (want('shop')) {
+    await ev(() => {
+      const { game: g } = window.__dtc;
+      g.state.time.season = 1;
+      g.state.time.day = 3;
+      g.state.time.minutes = 10 * 60;
+      g.state.manor.upgrades.push('hall', 'shop');
+      for (const [def, n] of [['iron_bar', 6], ['potion_heal', 3], ['apple', 8], ['copper_sword', 1], ['bread', 5], ['glass', 4]]) g.give(def, n);
+      g.goTo({ kind: 'interior', id: 'ashshop' }, { x: 7 * 16, y: 2 * 16 + 12, facing: 0 });
+    });
+    await wait(1200);
+    await ev(() => {
+      const { game: g } = window.__dtc;
+      const defs = ['iron_bar', 'potion_heal', 'apple', 'copper_sword', 'bread', 'glass'];
+      defs.forEach((def, i) => g.placeOnDisplay(i, g.state.inventory.findIndex((s) => s?.def === def)));
+      g.state.shop.popularity = 90;
+      g.toggleShop();
+    });
+    await wait(9000);
+    await shot('08-shop-floor');
+    await ev(() => window.__dtc.game.openShopfront(1));
+    await wait(300);
+    await shot('09-shopfront');
+    await ev(() => window.__dtc.game.closePanel());
+    await ev(() => {
+      const { game: g } = window.__dtc;
+      g.state.dungeon.deepest = 24;
+      g.state.hero.gold = 5000;
+      g.goTo({ kind: 'interior', id: 'trading' });
+    });
+    await wait(1200);
+    await ev(() => window.__dtc.game.openAuction());
+    await wait(300);
+    await page.click('.panel .shop-row >> nth=2');
+    await wait(200);
+    await shot('10-auction');
+    await ev(() => window.__dtc.game.closePanel());
+  }
 } finally {
   console.log(errors.length ? `ERRORS:\n${errors.join('\n')}` : 'no page errors');
   await browser.close();
