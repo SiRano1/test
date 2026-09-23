@@ -22,6 +22,7 @@ import { buyPrice, dailyEconomy, recordSale, sellPrice, shopStock } from './syst
 import { addToContainer, capacityFor, makeStack, sortContainer } from './systems/inventory';
 import { itemName, makeItem } from './systems/loot';
 import { classLevel, computeStats, xpToNext, type Buff } from './systems/stats';
+import { learnTalent, resetTalents, talentPoints } from './systems/talents';
 import { bedSpawn, buildInterior, infirmarySpawn, interiorEntry } from './town/interiors';
 import { buildTown, doorSpawn } from './town/town';
 import type { EquipSlot, ItemStack, Stats, WeaponClass } from './types';
@@ -390,6 +391,28 @@ export class Game implements GameApi, DialogueHost {
       this.toast(tr('classUp', { cls: t(CLASS_NAMES[cls]), n: after }), '#a0e0ff');
       this.refreshStats();
     }
+  }
+
+  /** Изучить талант (очки дают уровни мастерства класса). */
+  learnTalent(id: string): boolean {
+    if (!learnTalent(this.state, id)) return false;
+    this.world.fx({ t: 'sfx', id: 'levelup' });
+    this.refreshStats();
+    return true;
+  }
+
+  /** Цена сброса талантов класса. */
+  talentResetCost(cls: WeaponClass): number {
+    return 40 * talentPoints(this.state, cls).spent;
+  }
+
+  resetTalents(cls: WeaponClass): boolean {
+    const cost = this.talentResetCost(cls);
+    if (cost <= 0 || this.state.hero.gold < cost) return false;
+    this.state.hero.gold -= cost;
+    resetTalents(this.state, cls);
+    this.refreshStats();
+    return true;
   }
 
   useEnergy(n: number, force = false): boolean {

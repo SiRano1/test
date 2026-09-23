@@ -6,6 +6,7 @@ import { ELEMENT_COLORS, HEAVY_MANA, staffElement, WEAPON_PROFILES, type SwingDe
 import type { InputFrame } from '../input';
 import type { Element, ItemStack, Stats, WeaponClass } from '../types';
 import type { GameApi, World } from '../world';
+import { activeTalents } from '../systems/talents';
 import { Actor } from './entity';
 import { Projectile } from './projectile';
 
@@ -50,6 +51,12 @@ export class Player extends Actor {
   private lastStep = 0;
   /** Посох без маны бьёт как палка. */
   private forceMelee = false;
+  /** Изученные таланты текущего класса оружия. */
+  talents = new Set<string>();
+  /** Множитель расхода стамины на блок. */
+  blockCost = 1;
+  /** После парирования (талант «Ответный удар») следующий удар — критический. */
+  counterCrit = false;
 
   constructor(private game: GameApi) {
     super();
@@ -86,12 +93,46 @@ export class Player extends Actor {
       this.profile = WEAPON_PROFILES.fist;
       this.element = 'phys';
     }
-    this.blockRatio = this.profile.blockRatio;
-    this.parryWindow = this.profile.parry;
+    this.talents = new Set(activeTalents(this.game.state, this.weaponCls).map((d) => d.id));
+    this.profile = this.tunedProfile(this.profile);
+    this.blockRatio = this.tal('sh_bastion') ? 0.95 : this.profile.blockRatio;
+    this.parryWindow = this.profile.parry + (this.tal('sh_parry') ? 0.1 : 0);
+    this.blockCost = this.tal('sh_unbreak') ? 0.5 : 1;
+  }
+
+  tal(id: string): boolean {
+    return this.talents.has(id);
+  }
+
+  /** Профиль оружия с поправками талантов (дальность, четвёртый удар, откаты). */
+  private tunedProfile(base: WeaponProfile): WeaponProfile {
+    if (this.talents.size === 0) return base;
+    const p: WeaponProfile = { ...base, combo: base.combo.map((c) => ({ ...c })), heavy: { ...base.heavy }, skill: { ...base.skill } };
+    if (this.tal('sp_reach')) {
+      for (const c of p.combo) c.r *= 1.2;
+      p.heavy.r *= 1.2;
+    }
+    if (this.tal('sw_fourth')) {
+      const last = p.combo[p.combo.length - 1]!;
+      p.combo.push({ ...last, mult: 1.9, windup: 0.1, active: 0.14, recover: 0.4, r: last.r + 3, half: 1.6, step: 10, stamina: 16, knock: 240 });
+    }
+    if (this.tal('sp_lunge')) p.heavy.mult *= 1.3;
+    if (this.tal('sp_dragon')) p.heavy.mult *= 1.3;
+    if (this.tal('sh_hammer')) {
+      p.heavy.mult *= 1.4;
+      p.heavy.r *= 1.3;
+    }
+    if (this.tal('sw_whirl2') || this.tal('sp_throw2') || this.tal('sh_ram')) p.skill.cd = 3.5;
+    return p;
+  }
+
+  /** Сколько держать атаку для заряженного удара. */
+  get chargeTime(): number {
+    return this.tal('bw_draw') ? 0.31 : 0.45;
   }
 
   get chargeP(): number {
-    return this.state === 'charge' ? Math.min(1, this.chargeT / 0.45) : 0;
+    return this.state === 'charge' ? Math.min(1, this.chargeT / this.chargeTime) : 0;
   }
 
   get skillReady(): boolean {
@@ -190,7 +231,7 @@ export class Player extends Actor {
         this.move(w, inp, dt, 0.45);
         this.chargeT += dt;
         if (!inp.down.has('attack')) {
-          if (this.chargeT >= 0.45) this.startHeavy(w);
+          if (this.chargeT >= this.chargeTime) this.startHeavy(w);
           else this.setState('free');
         } else if (this.buffered(w, 'dodge')) this.startDodge(w, inp);
         break;
@@ -251,7 +292,7 @@ export class Player extends Actor {
         // без маны посох бьёт как палка
         return this.startMelee(w, WEAPON_PROFILES.fist.combo[0]!, 0, true);
       }
-    } else if (!this.spend(def.stamina)) return;
+    } else if (!this.spend(def.stamina * this.staminaMul())) return;
     this.startMelee(w, def, combo, false);
   }
 
@@ -273,7 +314,7 @@ export class Player extends Actor {
     const h = this.profile.heavy;
     if (this.profile.ranged === 'bolt') {
       if (!this.spendMana(HEAVY_MANA)) return this.setState('free');
-    } else if (!this.spend(h.stamina)) return this.setState('free');
+    } else if (!this.spend(h.stamina * this.staminaMul())) return this.setState('free');
     this.setState('heavy');
     this.forceMelee = false;
     this.swing = h;
@@ -282,6 +323,10 @@ export class Player extends Actor {
     this.swingDir = 1;
     this.attackAngle = this.aim;
     w.fx({ t: 'sfx', id: 'heavy' });
+  }
+
+  private staminaMul(): number {
+    return this.tal('sw_stamina') ? 0.85 : 1;
   }
 
   private atkSpeed(): number {
@@ -307,7 +352,10 @@ export class Player extends Actor {
       }
     } else if (this.phase === 'active') {
       this.swingP = Math.min(1, this.phaseT / Math.max(0.01, sw.active));
-      if (lunge) w.map.move(this, fx * 260 * dt, fy * 260 * dt);
+      if (lunge) {
+        const sp = this.tal('sp_dragon') ? 340 : 260;
+        w.map.move(this, fx * sp * dt, fy * sp * dt);
+      }
       else if (sw.step > 0) w.map.move(this, (fx * sw.step * dt) / (sw.windup + sw.active), (fy * sw.step * dt) / (sw.windup + sw.active));
       if (this.phaseT >= sw.active) {
         this.phase = 'recover';
@@ -335,12 +383,31 @@ export class Player extends Actor {
 
   private baseSpec(mult: number, knock: number, heavy: boolean): HitSpec {
     const st = this.stats;
-    const dmg = Math.max(1, st.atk) * mult * (1 + st.dmgPct / 100);
+    let dmg = Math.max(1, st.atk) * mult * (1 + st.dmgPct / 100);
+    if (this.tal('sw_oath') && this.hp < this.maxHp * 0.3) dmg *= 1.3;
+    let crit = st.crit;
+    if (this.counterCrit) {
+      crit = 1;
+      this.counterCrit = false;
+    }
     return {
       dmg, element: this.element, fire: st.fire, ice: st.ice, shock: st.shock, holy: st.holy,
-      crit: st.crit, critMul: st.critMul, knock: knock * st.knockback, heavy, lifesteal: st.lifesteal,
-      source: this, cls: this.weaponCls ?? undefined,
+      crit, critMul: st.critMul, knock: knock * st.knockback, heavy, lifesteal: st.lifesteal,
+      source: this, cls: this.weaponCls ?? undefined, status: this.talentStatus(),
     };
+  }
+
+  /** Статус, который накладывают удары благодаря талантам. */
+  private talentStatus(): HitSpec['status'] {
+    if (this.tal('sw_bleed')) return { id: 'bleed', chance: 0.25, duration: 3, power: Math.max(1, this.stats.atk / 8) };
+    if (this.tal('bw_poison')) return { id: 'poison', chance: 0.25, duration: 4, power: Math.max(1, this.stats.atk / 8) };
+    if (this.tal('sp_sweep') || this.tal('st_ice')) return { id: 'slow', chance: 0.3, duration: 2 };
+    return undefined;
+  }
+
+  /** Парирование удалось: талант «Ответный удар» заряжает крит. */
+  onParried(): void {
+    if (this.tal('sh_counter')) this.counterCrit = true;
   }
 
   /** Момент удара: создаём хитбокс/снаряд. */
@@ -354,15 +421,19 @@ export class Player extends Actor {
     if (p.ranged) {
       const kind = heavy ? p.heavy.kind : p.ranged;
       if (p.ranged === 'arrow') {
-        const pr = new Projectile(this.x + ox, this.y + oy, a, (p.projSpeed ?? 250) * (heavy ? 1.4 : 1), 'player', spec, 'arrow', { pierce: heavy ? 3 : 0, life: 1.4 });
+        const pr = new Projectile(this.x + ox, this.y + oy, a, (p.projSpeed ?? 250) * (heavy ? 1.4 : 1), 'player', spec, 'arrow', { pierce: heavy ? 3 : this.tal('bw_pierce') ? 1 : 0, life: 1.4 });
         w.add(pr);
       } else {
         const col = ELEMENT_COLORS[this.element];
         const orb = kind === 'orb';
+        const meteor = orb && this.tal('st_meteor');
         const pr = new Projectile(this.x + ox, this.y + oy, a, (p.projSpeed ?? 200) * (orb ? 0.75 : 1), 'player', spec, orb ? 'orb' : 'bolt', {
-          color: col, radius: orb ? 5 : 3, life: 1.3, explode: orb ? { r: 30, mult: 1, color: col } : undefined,
+          color: col, radius: orb ? 5 : 3, life: 1.3, explode: orb ? { r: meteor ? 42 : 30, mult: meteor ? 1.3 : 1, color: col } : undefined,
         });
         w.add(pr);
+        if (!orb && this.tal('st_echo') && w.rng.chance(0.2)) {
+          w.add(new Projectile(this.x + ox, this.y + oy, a + w.rng.range(-0.12, 0.12), (p.projSpeed ?? 200) * 0.9, 'player', this.baseSpec(sw.mult, sw.knock, false), 'bolt', { color: col, radius: 3, life: 1.3 }));
+        }
       }
       return;
     }
@@ -381,6 +452,9 @@ export class Player extends Actor {
     }
     w.spawnHitbox({ owner: this, team: 'player', shape: 'arc', x: this.x, y: this.y - 4, r: sw.r, angle: a, half: sw.half, follow: true, ox: 0, oy: -4, t: sw.active, delay: 0, breaks: true, spec });
     w.fx({ t: 'slash', x: this.x, y: this.y - 4, angle: a, r: sw.r, half: sw.half, color: p.color, heavy, dur: sw.active + 0.05 });
+    if (heavy && this.tal('sw_wave')) {
+      w.add(new Projectile(this.x + fx * 10, this.y - 5 + fy * 10, a, 230, 'player', this.baseSpec(sw.mult * 0.6, 120, false), 'wave', { pierce: 4, life: 0.6, radius: 6, color: '#d0e0ff' }));
+    }
   }
 
   // ───── Перекат ─────
@@ -437,7 +511,7 @@ export class Player extends Actor {
         // два оборота, по хитбоксу на каждый
         if (this.skillHits < 2 && t >= 0.08 + this.skillHits * 0.2) {
           this.skillHits++;
-          w.spawnHitbox({ owner: this, team: 'player', shape: 'circle', x: this.x, y: this.y - 4, r: 30, angle: 0, half: Math.PI, follow: true, ox: 0, oy: -4, t: 0.12, delay: 0, breaks: true, spec: this.baseSpec(1.5, 150, true) });
+          w.spawnHitbox({ owner: this, team: 'player', shape: 'circle', x: this.x, y: this.y - 4, r: 30, angle: 0, half: Math.PI, follow: true, ox: 0, oy: -4, t: 0.12, delay: 0, breaks: true, spec: this.baseSpec(this.tal('sw_whirl2') ? 2.25 : 1.5, 150, true) });
           w.fx({ t: 'slash', x: this.x, y: this.y - 4, angle: a + this.skillHits * Math.PI, r: 30, half: Math.PI, color: '#f0f0ff', heavy: true, dur: 0.2 });
           w.fx({ t: 'sfx', id: 'swing' });
         }
@@ -448,14 +522,14 @@ export class Player extends Actor {
       case 'throw':
         if (this.skillHits === 0 && t >= 0.1) {
           this.skillHits = 1;
-          w.add(new Projectile(this.x + fx * 6, this.y - 5 + fy * 6, a, 300, 'player', this.baseSpec(1.8, 160, true), 'spear', { pierce: 5, life: 0.7 }));
+          w.add(new Projectile(this.x + fx * 6, this.y - 5 + fy * 6, a, 300, 'player', this.baseSpec(this.tal('sp_throw2') ? 2.5 : 1.8, 160, true), 'spear', { pierce: 5, life: 0.7 }));
         }
         if (t > 0.35) done();
         break;
       case 'triple':
         if (this.skillHits === 0 && t >= 0.1) {
           this.skillHits = 1;
-          for (const off of [-0.22, 0, 0.22])
+          for (const off of this.tal('bw_rain') ? [-0.4, -0.2, 0, 0.2, 0.4] : [-0.22, 0, 0.22])
             w.add(new Projectile(this.x + fx * 4, this.y - 5 + fy * 4, a + off, 280, 'player', this.baseSpec(1, 70, false), 'arrow', { life: 1.2 }));
         }
         if (t > 0.35) done();
@@ -464,7 +538,7 @@ export class Player extends Actor {
         if (this.skillHits === 0 && t >= 0.15) {
           this.skillHits = 1;
           const col = ELEMENT_COLORS[this.element];
-          w.spawnHitbox({ owner: this, team: 'player', shape: 'circle', x: this.x, y: this.y - 4, r: 50, angle: 0, half: Math.PI, follow: false, ox: 0, oy: 0, t: 0.12, delay: 0, breaks: true, spec: this.baseSpec(1.8, 200, true) });
+          w.spawnHitbox({ owner: this, team: 'player', shape: 'circle', x: this.x, y: this.y - 4, r: 50, angle: 0, half: Math.PI, follow: false, ox: 0, oy: 0, t: 0.12, delay: 0, breaks: true, spec: { ...this.baseSpec(1.8, 200, true), stunOnHit: this.tal('st_zero') ? 1.2 : undefined } });
           w.fx({ t: 'ring', x: this.x, y: this.y - 4, r: 50, color: col, dur: 0.35 });
           w.shake(3, 0.2);
         }
@@ -475,7 +549,7 @@ export class Player extends Actor {
           w.map.move(this, fx * 220 * dt, fy * 220 * dt);
           if (this.skillHits === 0) {
             this.skillHits = 1;
-            w.spawnHitbox({ owner: this, team: 'player', shape: 'arc', x: this.x, y: this.y - 4, r: 20, angle: a, half: 1.2, follow: true, ox: 0, oy: -4, t: 0.2, delay: 0, breaks: true, spec: { ...this.baseSpec(1.1, 200, true), stunOnHit: 1.5 } });
+            w.spawnHitbox({ owner: this, team: 'player', shape: 'arc', x: this.x, y: this.y - 4, r: 20, angle: a, half: 1.2, follow: true, ox: 0, oy: -4, t: 0.2, delay: 0, breaks: true, spec: { ...this.baseSpec(1.1, 200, true), stunOnHit: this.tal('sh_ram') ? 2.5 : 1.5 } });
           }
         }
         if (t > 0.4) done();
@@ -493,7 +567,7 @@ export class Player extends Actor {
       const k = this.state === 'block' ? 0.35 : this.state === 'charge' ? 0.2 : 1;
       this.stamina = Math.min(this.maxStamina, this.stamina + this.stats.staminaRegen * k * dt);
     }
-    this.mana = Math.min(this.maxMana, this.mana + 2 * dt);
+    this.mana = Math.min(this.maxMana, this.mana + (this.tal('st_mana') ? 3.5 : 2) * dt);
     if (this.stats.regen > 0 && !this.dead) this.hp = Math.min(this.maxHp, this.hp + this.stats.regen * dt);
   }
 

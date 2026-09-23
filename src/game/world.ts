@@ -135,7 +135,7 @@ export class World {
     const p = a as any;
     if (typeof p.stamina === 'number') {
       if (p.stamina <= 0) return false;
-      p.stamina = Math.max(0, p.stamina - n);
+      p.stamina = Math.max(0, p.stamina - n * (p.blockCost ?? 1));
       p.staminaDelay = 0.8;
       return true;
     }
@@ -144,6 +144,7 @@ export class World {
 
   onParry(target: Actor, _src: Actor | null): void {
     if (target === this.player) {
+      (this.player as any).onParried?.();
       const cls = (this.player as any).weaponCls as WeaponClass | undefined;
       if (cls) this.game.addClassXp(cls, 3);
     }

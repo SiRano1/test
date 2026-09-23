@@ -776,3 +776,75 @@ input[type='text'] {
   max-width: 400px;
   line-height: 1.5;
 }
+
+/* ── Таланты ── */
+.mastery {
+  padding: 2px 3px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mastery:hover {
+  border-color: var(--edge);
+}
+.mastery.on {
+  border-color: var(--edge-hi);
+  background: var(--panel-2);
+}
+.mastery .row {
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+}
+.mastery .row > span:first-child {
+  flex: 1;
+}
+.mastery .pts {
+  color: #8fe08a;
+  font-size: 6px;
+}
+.tal-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.tal-row {
+  display: grid;
+  grid-template-columns: 14px repeat(3, 1fr);
+  gap: 3px;
+  align-items: stretch;
+}
+.tal-tier {
+  color: var(--gold);
+  font-size: 7px;
+  align-self: center;
+  text-align: center;
+}
+button.tal {
+  min-height: 20px;
+  font-size: 7px;
+  line-height: 1.1;
+  padding: 2px 3px;
+  white-space: normal;
+}
+button.tal.owned {
+  color: var(--gold);
+  border-color: var(--gold);
+  background: #2a1e14;
+}
+button.tal.ready {
+  color: #c8f0c0;
+  border-color: #5a8a50;
+}
+button.tal.poor {
+  color: var(--ink-dim);
+}
+button.tal.locked {
+  color: #6a5a60;
+  border-style: dashed;
+}
+button.tal.sel {
+  box-shadow: 0 0 0 1px var(--ink);
+}

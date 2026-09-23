@@ -20,9 +20,12 @@ import { epilogue, type EndingId } from '../../data/endings';
 import { FACTIONS, repTier } from '../../data/factions';
 import { WEATHER_ICONS, seasonName, weekday } from '../../game/systems/calendar';
 import { formatAffix, itemName, RARITY_NAMES } from '../../game/systems/loot';
-import { classLevel, classXpToNext, xpToNext } from '../../game/systems/stats';
+import { classLevel, classXpToNext, weaponClassOf, xpToNext } from '../../game/systems/stats';
+import { talentBlock, talentPoints, talentsOf } from '../../game/systems/talents';
+import { TALENT_BY_ID } from '../../data/talents';
+import { WEAPON_PROFILES } from '../../game/combat/weapons';
 import { listSaves, type KV } from '../../game/systems/save';
-import { EQUIP_SLOTS, WEAPON_CLASSES, type EquipSlot, type ItemStack } from '../../game/types';
+import { EQUIP_SLOTS, WEAPON_CLASSES, type EquipSlot, type ItemStack, type WeaponClass } from '../../game/types';
 import type { Audio } from '../engine/audio';
 import type { Renderer } from '../gfx/renderer';
 import { clear, h, show } from './dom';
@@ -76,6 +79,8 @@ export class Ui {
   private serviceSel: ItemRef | null = null;
   private buildMsg = '';
   menuTab: MenuTab = 'inv';
+  private skillCls: WeaponClass | null = null;
+  private skillSel: string | null = null;
   menuOpen = false;
   pauseOpen = false;
   private selInv: number | null = null;
@@ -505,24 +510,75 @@ export class Ui {
 
   private renderSkills(body: HTMLElement, g: Game): void {
     const s = g.state;
-    const col = h('div', { class: 'col', style: 'width:100%' }, h('h2', null, t(L('Мастерство оружия', 'Weapon Mastery'))));
-    for (const cls of WEAPON_CLASSES) {
-      const xp = s.hero.classXp[cls];
+    if (!this.skillCls) this.skillCls = weaponClassOf(s) ?? 'sword';
+    const cls = this.skillCls;
+    const left = h('div', { class: 'col', style: 'width:132px;flex:none' }, h('h2', null, t(L('Мастерство', 'Mastery'))));
+    for (const c of WEAPON_CLASSES) {
+      const xp = s.hero.classXp[c];
       const lvl = classLevel(xp);
       let rest = xp;
       for (let l = 1; l < lvl; l++) rest -= classXpToNext(l);
       const need = classXpToNext(lvl);
-      col.append(h('div', { class: 'row', style: 'justify-content:flex-start;gap:6px' },
-        h('span', { style: 'width:60px' }, t(CLASS_NAMES[cls])),
-        h('span', { class: 'gold-text', style: 'width:40px' }, tr('level', { n: lvl })),
-        h('div', { class: 'bar', style: 'width:140px;height:4px' }, h('i', { style: `background:var(--gold);transform:scaleX(${Math.min(1, rest / need)})` })),
-        h('span', { class: 'sub', style: 'font-size:6px;color:var(--ink-dim)' }, `+${2 * (lvl - 1)}% ${t(L('урона', 'damage'))}`)));
+      const pts = talentPoints(s, c);
+      left.append(h('div', { class: `mastery interactive ${c === cls ? 'on' : ''}`, onclick: () => ((this.skillCls = c), (this.skillSel = null), this.renderMenu()) },
+        h('div', { class: 'row' },
+          h('span', null, t(CLASS_NAMES[c])),
+          h('span', { class: 'gold-text num' }, String(lvl)),
+          pts.free > 0 ? h('span', { class: 'pts num' }, `+${pts.free}`) : h('span', { class: 'sub' }, '')),
+        h('div', { class: 'bar', style: 'height:3px' }, h('i', { style: `background:var(--gold);transform:scaleX(${Math.min(1, rest / need)})` }))));
     }
-    col.append(h('p', { class: 'help' }, t(L(
-      'Мастерство растёт от использования: каждое попадание оружием даёт опыт его классу. Уровень класса усиливает урон этим оружием. Навык Q зависит от класса оружия в руках.',
-      'Mastery grows with use: every hit grants experience to that weapon class. Class level boosts damage with that weapon. The Q skill depends on the weapon in hand.',
+    left.append(h('p', { class: 'help' }, t(L(
+      'Каждое попадание учит владению оружием. Уровень класса даёт +2% урона и очко таланта. Таланты работают, только пока это оружие в руках.',
+      'Every hit teaches you the weapon. Each class level grants +2% damage and a talent point. Talents only work while that weapon is in hand.',
     ))));
-    body.append(col);
+
+    const pts = talentPoints(s, cls);
+    const right = h('div', { class: 'col', style: 'flex:1;min-width:0' },
+      h('div', { class: 'row' },
+        h('h2', null, `${t(CLASS_NAMES[cls])} · ${t(WEAPON_PROFILES[cls].skill.name)}`),
+        h('span', { class: 'sub' }, `${t(L('Очки', 'Points'))}: `, h('b', { class: 'gold-text num' }, `${pts.free}/${pts.total}`))));
+    const tiers = h('div', { class: 'tal-tree' });
+    for (const tier of [1, 2, 3] as const) {
+      const row = h('div', { class: 'tal-row' }, h('span', { class: 'tal-tier' }, ['I', 'II', 'III'][tier - 1]!));
+      for (const d of talentsOf(cls).filter((x) => x.tier === tier)) {
+        const why = talentBlock(s, d.id);
+        const st = why === 'owned' ? 'owned' : why === null ? 'ready' : why === 'points' ? 'poor' : 'locked';
+        row.append(h('button', {
+          class: `tal ${st} ${this.skillSel === d.id ? 'sel' : ''}`,
+          onclick: () => ((this.skillSel = d.id), this.renderMenu()),
+          ondblclick: () => { if (g.learnTalent(d.id)) this.renderMenu(); },
+        }, t(d.name)));
+      }
+      tiers.append(row);
+    }
+    right.append(tiers);
+    const sel = this.skillSel ? TALENT_BY_ID[this.skillSel] : null;
+    const detail = h('div', { class: 'detail', style: 'min-height:44px' });
+    if (sel && sel.cls === cls) {
+      const why = talentBlock(s, sel.id);
+      const reason: Record<string, Loc> = {
+        owned: L('Изучено', 'Learned'),
+        points: L('Не хватает очков', 'Not enough points'),
+        prereq: L('Нужен талант предыдущей ступени', 'Requires a talent from the previous tier'),
+      };
+      detail.append(
+        h('div', { class: 't' }, t(sel.name)),
+        h('div', null, t(sel.desc)),
+        h('div', { class: 'sub' }, `${t(L('Стоимость', 'Cost'))}: ${sel.tier}`));
+      const act = h('div', { class: 'actions' });
+      if (why === null) act.append(h('button', { onclick: () => { if (g.learnTalent(sel.id)) this.renderMenu(); } }, t(L('Изучить', 'Learn'))));
+      else act.append(h('span', { class: why === 'owned' ? 'gold-text' : 'sub' }, t(reason[why] ?? L('—', '—'))));
+      detail.append(act);
+    } else {
+      detail.append(h('div', { class: 't' }, t(WEAPON_PROFILES[cls].skill.name), h('span', { class: 'sub' }, ' · Q')), h('div', null, t(WEAPON_PROFILES[cls].skill.desc)));
+    }
+    right.append(detail);
+    const cost = g.talentResetCost(cls);
+    if (cost > 0)
+      right.append(h('div', { class: 'row', style: 'justify-content:flex-end' },
+        h('button', { disabled: s.hero.gold < cost ? true : undefined, onclick: () => { if (g.resetTalents(cls)) ((this.skillSel = null), this.renderMenu()); } },
+          `${t(L('Забыть таланты', 'Reset talents'))} · ${tr('gold', { n: cost })}`)));
+    body.append(left, right);
   }
 
   private renderQuests(body: HTMLElement, g: Game): void {

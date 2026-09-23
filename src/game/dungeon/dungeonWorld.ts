@@ -8,6 +8,7 @@ import { monsterDef } from '../../data/monsters';
 import { Boss } from '../entities/boss';
 import { Enemy } from '../entities/enemy';
 import { Breakpot, Chest, CrackedWall, LoreObject, OreNode, Prop, Spot } from '../entities/props';
+import { BrazierPuzzle, DartTrap, FireGrate, PlatePuzzle, PressurePlate, PuzzleBrazier, RuneTrap, SealedChest, SpikeTrap, Tablet, type TrapKind } from '../entities/traps';
 import { World, type GameApi, type SpawnSpec } from '../world';
 import { cx, cy, generateBossFloor, generateFloor, type Room } from './generator';
 
@@ -74,9 +75,17 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   // треснувшие стены
   for (const [tx, ty] of layout.cracked) w.addNow(new CrackedWall(tx, ty));
 
+  // комната-головоломка
+  const puzzleCands = layout.rooms.filter((r) => r.role === 'combat' && r.depth >= 8 && r.w >= 6 && r.h >= 5);
+  const puzzleRoom = floor >= 3 && puzzleCands.length && rng.chance(0.3) ? rng.pick(puzzleCands) : null;
+  if (puzzleRoom) {
+    puzzleRoom.role = 'puzzle';
+    placePuzzle(w, rng, puzzleRoom, floor, free, mark);
+  }
+
   // монстры по бюджету угрозы
   const budget = 6 + floor * 1.3 + (floor % 10) * 0.4;
-  const fightRooms = layout.rooms.filter((r) => r.role !== 'start' && r.role !== 'secret');
+  const fightRooms = layout.rooms.filter((r) => r.role !== 'start' && r.role !== 'secret' && r.role !== 'puzzle');
   const area = fightRooms.reduce((n, r) => n + r.w * r.h, 0);
   for (const r of fightRooms) {
     let b = (budget * (r.w * r.h)) / area;
@@ -140,6 +149,8 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
     }
   }
 
+  placeTraps(w, rng, layout.rooms, floor, tier, free, mark);
+
   // руда
   const oreCount = rng.int(3, 6);
   for (let i = 0; i < oreCount; i++) {
@@ -159,6 +170,102 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   }
 
   return { world: w, spawn: { x: px(sx), y: px(sy) + 6, facing: 0 } };
+}
+
+const TRAPS_BY_TIER: Record<number, TrapKind[]> = {
+  1: ['spikes'],
+  2: ['spikes', 'dart'],
+  3: ['spore', 'spikes', 'dart'],
+  4: ['fire', 'dart'],
+  5: ['frost', 'dart', 'spikes'],
+  6: ['fire', 'spikes'],
+  7: ['spikes', 'fire', 'frost', 'dart'],
+};
+
+/** Ловушки: шипы полосой, решётки и руны на полу, самострелы в северных стенах. */
+function placeTraps(w: World, rng: Rng, rooms: Room[], floor: number, tier: TierDef, free: (x: number, y: number) => boolean, mark: (x: number, y: number) => void) {
+  if (floor < 2) return;
+  const kinds = TRAPS_BY_TIER[tier.id] ?? ['spikes'];
+  const pool = rooms.filter((r) => (r.role === 'combat' || r.role === 'treasure' || r.role === 'exit') && r.depth >= 6);
+  if (!pool.length) return;
+  const count = Math.min(6, rng.int(1, 2 + Math.floor(floor / 12)));
+  for (let n = 0; n < count; n++) {
+    const r = rng.pick(pool);
+    const kind = rng.pick(kinds);
+    if (kind === 'dart') {
+      for (let i = 0; i < 20; i++) {
+        const tx = rng.int(r.x + 1, r.x + r.w - 2);
+        if (!free(tx, r.y) || w.map.get(tx, r.y - 1) !== Tile.WALL) continue;
+        mark(tx, r.y);
+        w.addNow(new DartTrap(tx, r.y - 1, rng.range(0, 2)));
+        break;
+      }
+      continue;
+    }
+    const pos = randomTile(rng, r, free);
+    if (!pos) continue;
+    const [tx, ty] = pos;
+    if (kind === 'spikes') {
+      // полоса из 2–3 плит с волной по фазе
+      const len = rng.int(2, 3);
+      const horiz = rng.chance(0.5);
+      for (let i = 0; i < len; i++) {
+        const x = horiz ? tx + i : tx, y = horiz ? ty : ty + i;
+        if (!free(x, y)) break;
+        mark(x, y);
+        w.addNow(new SpikeTrap(x, y, i * 0.35));
+      }
+    } else if (kind === 'fire') {
+      mark(tx, ty);
+      w.addNow(new FireGrate(tx, ty, rng.range(0, 3)));
+    } else {
+      mark(tx, ty);
+      w.addNow(new RuneTrap(tx, ty, kind));
+    }
+  }
+}
+
+/** Головоломка: плиты по скрижали или жаровни на время. Награда — запечатанный сундук. */
+function placePuzzle(w: World, rng: Rng, r: Room, floor: number, free: (x: number, y: number) => boolean, mark: (x: number, y: number) => void) {
+  const cpos = centerish(rng, r, free);
+  if (!cpos) return;
+  mark(cpos[0], cpos[1]);
+  const chest = new SealedChest(px(cpos[0]), cpos[1] * TILE + 14);
+  w.addNow(chest);
+  const tabletX = (() => {
+    for (let i = 0; i < 20; i++) {
+      const tx = rng.int(r.x + 1, r.x + r.w - 2);
+      if (w.map.get(tx, r.y - 1) === Tile.WALL && free(tx, r.y)) return tx;
+    }
+    return null;
+  })();
+  if (tabletX !== null && rng.chance(0.6)) {
+    const puzzle = new PlatePuzzle(rng.shuffle([0, 1, 2, 3]), chest);
+    w.addNow(new Tablet(tabletX, r.y - 1, puzzle));
+    mark(tabletX, r.y);
+    const taken: [number, number][] = [];
+    for (let s = 0; s < 4; s++) {
+      for (let i = 0; i < 40; i++) {
+        const tx = rng.int(r.x, r.x + r.w - 1), ty = rng.int(r.y + 1, r.y + r.h - 1);
+        if (!free(tx, ty) || taken.some(([a, b]) => Math.abs(a - tx) + Math.abs(b - ty) < 2)) continue;
+        taken.push([tx, ty]);
+        mark(tx, ty);
+        w.addNow(new PressurePlate(tx, ty, s, puzzle));
+        break;
+      }
+    }
+    if (taken.length < 4) chest.unseal(w, true); // не уместилось — просто награда
+    return;
+  }
+  const n = floor >= 20 ? 4 : 3;
+  const puzzle = new BrazierPuzzle(chest);
+  for (let i = 0; i < n; i++) {
+    const pos = wallAdjacent(rng, r, w.map, free);
+    if (!pos) continue;
+    mark(pos[0], pos[1]);
+    w.addNow(new PuzzleBrazier(pos[0], pos[1], puzzle, 7.5 - n * 0.6));
+  }
+  if (puzzle.braziers.length < 2) chest.unseal(w, true);
 }
 
 function placeLore(w: World, rng: Rng, r: Room, id: string, kind: 'note' | 'fresco' | 'diary', free: (x: number, y: number) => boolean, mark: (x: number, y: number) => void) {

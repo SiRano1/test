@@ -57,6 +57,16 @@ export function propArt(key: string, season: number): Art | null {
       return art([fresco()], 8, 2);
     case 'cracked':
       return art([cracks()], 8, 15);
+    case 'trap':
+      return trapArt(a!, Number(b ?? 0));
+    case 'plate':
+      return art([plate(Number(a), b === '1')], 8, 15);
+    case 'tablet':
+      return art([tablet(a!)], 8, 15);
+    case 'pbrazier':
+      return art([brazierCold()], 6, 15);
+    case 'chest_sealed':
+      return sealedChest();
     case 'decor':
       return decor(a!);
     case 'well':
@@ -191,6 +201,116 @@ function fresco(): Grid {
   g.rect(7, 7, 2, 2, '#1a1010');
   g.rect(2, 6, 2, 5, '#4a5a7a').rect(12, 6, 2, 5, '#4a5a7a');
   return g;
+}
+
+// ─────────────────────────── Ловушки и головоломки ───────────────────────────
+
+const STONE = '#5a5460', STONE_D = '#3a3440', STONE_L = '#7a7480';
+
+function trapArt(kind: string, ph: number): Art {
+  const g = new Grid(16, 16);
+  switch (kind) {
+    case 'spikes': {
+      // плита с отверстиями; фаза 1 — кончики, фаза 2 — шипы
+      g.rect(1, 1, 14, 14, STONE_D).rect(2, 2, 12, 12, STONE).rect(2, 2, 12, 1, STONE_L);
+      for (const [x, y] of [[4, 4], [9, 4], [4, 9], [9, 9], [6, 6], [11, 11]] as const) {
+        g.rect(x, y, 2, 2, '#1a1418');
+        if (ph === 1) g.set(x, y, '#b8b8c8');
+        if (ph === 2) g.rect(x, y - 3, 2, 4, '#c8c8d8').set(x, y - 3, '#ffffff').set(x + 1, y, '#8a8a98');
+      }
+      return art([ph === 2 ? g.outline(OUT) : g], 8, 15);
+    }
+    case 'fire': {
+      g.rect(1, 1, 14, 14, '#2a2224').rect(2, 2, 12, 12, IRON);
+      for (let x = 3; x < 13; x += 3) g.rect(x, 2, 1, 12, '#1a1214');
+      if (ph >= 1) for (let x = 4; x < 13; x += 3) g.rect(x, 4, 2, 8, ph === 1 ? '#8a3010' : '#ff7020');
+      if (ph === 2) {
+        const flame = new Grid(16, 28);
+        flame.ellipse(2, 8, 12, 20, '#ff5020').ellipse(4, 4, 8, 20, '#ffa030').ellipse(6, 10, 4, 14, '#fff0a0');
+        const out = new Grid(16, 30);
+        for (let y = 0; y < 28; y++) for (let x = 0; x < 16; x++) out.set(x, y, flame.get(x, y));
+        for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (!out.get(x, y + 14)) out.set(x, y + 14, g.get(x, y));
+        return art([out], 8, 29);
+      }
+      return art([g], 8, 15);
+    }
+    case 'frost':
+    case 'spore': {
+      const c = kind === 'frost' ? '#6ab8e8' : '#8ac050';
+      const lit = ph === 1 ? shade(c, 0.4) : shade(c, -0.35);
+      g.ellipse(2, 2, 12, 12, lit).ellipse(3, 3, 10, 10, STONE_D);
+      if (kind === 'frost') g.line(8, 4, 8, 11, lit).line(4, 8, 11, 8, lit).line(5, 5, 10, 10, lit).line(10, 5, 5, 10, lit);
+      else g.ellipse(5, 5, 6, 6, lit).rect(7, 7, 2, 2, STONE_D).set(4, 11, lit).set(11, 4, lit);
+      return art([g], 8, 15);
+    }
+    case 'dart':
+    default: {
+      const d = new Grid(16, 16);
+      d.rect(4, 7, 8, 6, STONE_D).rect(5, 8, 6, 4, '#2a2228').rect(6, 12, 4, 1, '#1a1014');
+      d.rect(7, 9, 2, 3, '#0a0608').set(4, 7, STONE_L).set(11, 7, STONE_L);
+      return art([d], 8, 12);
+    }
+  }
+}
+
+const SYMBOL_COLORS = ['#ffd040', '#c0d0ff', '#ffffff', '#ff9a2e'];
+
+/** Символ 5×5: солнце, луна, звезда, корона. */
+function drawSymbol(g: Grid, sym: number, x: number, y: number, c: string): void {
+  switch (sym) {
+    case 0:
+      g.rect(x + 1, y + 1, 3, 3, c).set(x + 2, y, c).set(x + 2, y + 4, c).set(x, y + 2, c).set(x + 4, y + 2, c);
+      break;
+    case 1:
+      g.rect(x + 1, y, 2, 1, c).rect(x, y + 1, 2, 3, c).rect(x + 1, y + 4, 2, 1, c).set(x + 3, y + 4, c).set(x + 3, y, c);
+      break;
+    case 2:
+      g.rect(x + 2, y, 1, 5, c).rect(x, y + 2, 5, 1, c).set(x + 1, y + 1, c).set(x + 3, y + 3, c).set(x + 3, y + 1, c).set(x + 1, y + 3, c);
+      break;
+    default:
+      g.rect(x, y + 2, 5, 3, c).set(x, y + 1, c).set(x + 2, y, c).set(x + 2, y + 1, c).set(x + 4, y + 1, c);
+  }
+}
+
+function plate(sym: number, pressed: boolean): Grid {
+  const g = new Grid(16, 16);
+  const top = pressed ? '#4a4450' : STONE_L;
+  g.rect(1, 1, 14, 14, STONE_D).rect(2, pressed ? 3 : 2, 12, 11, top);
+  if (!pressed) g.rect(2, 13, 12, 1, STONE);
+  drawSymbol(g, sym, 6, pressed ? 6 : 5, pressed ? SYMBOL_COLORS[sym]! : shade(SYMBOL_COLORS[sym]!, -0.45));
+  return g;
+}
+
+function tablet(order: string): Grid {
+  // символы читаются слева направо, сверху вниз
+  const g = new Grid(16, 16);
+  g.rect(0, 1, 16, 15, '#8a8478').rect(1, 2, 14, 13, '#c8c0b0').rect(1, 2, 14, 1, '#e0d8c8');
+  const syms = order.split('').map(Number);
+  for (let i = 0; i < syms.length; i++) drawSymbol(g, syms[i]!, 2 + (i % 2) * 7, 3 + Math.floor(i / 2) * 6, '#3a2a30');
+  g.rect(7, 4, 2, 1, '#8a3a4a').rect(7, 10, 2, 1, '#8a3a4a');
+  return g.outline(OUT);
+}
+
+function brazierCold(): Grid {
+  const g = new Grid(12, 16);
+  g.rect(2, 8, 8, 3, IRON).rect(1, 7, 10, 1, IRON_L).rect(5, 11, 2, 3, IRON).rect(3, 14, 6, 1, IRON);
+  g.rect(3, 6, 6, 1, '#2a2224').set(4, 5, '#4a4046').set(7, 5, '#3a3036');
+  return g.outline(OUT);
+}
+
+function sealedChest(): Art {
+  const base = chest('chest_epic').frames[0]!;
+  const [cv, ctx] = makeCanvas(base.width, base.height);
+  ctx.drawImage(base, 0, 0);
+  // цепи крест-накрест и печать
+  ctx.fillStyle = '#9aa0ac';
+  for (let i = 0; i < 14; i += 2) {
+    ctx.fillRect(1 + i, 3 + Math.floor(i * 0.7), 1, 1);
+    ctx.fillRect(14 - i, 3 + Math.floor(i * 0.7), 1, 1);
+  }
+  ctx.fillStyle = '#c07bff';
+  ctx.fillRect(7, 7, 2, 2);
+  return { frames: [cv], ax: 8, ay: 14 };
 }
 
 function cracks(): Grid {

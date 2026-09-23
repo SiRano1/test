@@ -8,7 +8,7 @@ export interface Room {
   y: number;
   w: number;
   h: number;
-  role: 'start' | 'exit' | 'combat' | 'treasure' | 'secret' | 'shrine' | 'boss' | 'lore';
+  role: 'start' | 'exit' | 'combat' | 'treasure' | 'secret' | 'shrine' | 'boss' | 'lore' | 'puzzle';
   /** BFS-расстояние центра от старта. */
   depth: number;
 }

@@ -64,6 +64,10 @@ const SFX: Record<string, Part[]> = {
   thunder: [{ noise: true, dur: 1.8, vol: 0.35, lp: 400, lp1: 60 }, { noise: true, dur: 1.2, vol: 0.25, lp: 900, lp1: 100, delay: 0.15 }],
   craft: [{ wave: 'square', f0: 900, f1: 600, dur: 0.05, vol: 0.08 }, { noise: true, dur: 0.08, vol: 0.2, hp: 2000, delay: 0.06 }],
   uiback: [{ wave: 'square', f0: 500, dur: 0.03, vol: 0.05 }],
+  trap: [{ wave: 'square', f0: 1800, f1: 1200, dur: 0.03, vol: 0.07 }, { wave: 'square', f0: 900, dur: 0.03, vol: 0.05, delay: 0.05 }],
+  flame: [{ noise: true, dur: 0.5, vol: 0.28, lp: 1400, lp1: 300 }, { wave: 'sawtooth', f0: 70, f1: 50, dur: 0.4, vol: 0.08 }],
+  plate: [{ noise: true, dur: 0.08, vol: 0.25, lp: 700 }, { wave: 'sine', f0: 220, f1: 180, dur: 0.1, vol: 0.12 }],
+  solve: [0, 7, 12, 16, 19].map((s, i) => ({ wave: 'triangle' as Wave, f0: 392 * 2 ** (s / 12), dur: 0.22, vol: 0.1, delay: i * 0.08 })),
 };
 
 const SCALES = {

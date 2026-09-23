@@ -1,6 +1,7 @@
 import { AFFIX_BY_ID } from '../../data/affixes';
 import { itemDef } from '../../data/items';
 import type { GameState } from '../state';
+import { activeTalents } from './talents';
 import { baseStats, EQUIP_SLOTS, type ItemStack, type Stats, type WeaponClass } from '../types';
 
 /** Опыт до следующего уровня героя. */
@@ -61,6 +62,7 @@ export function computeStats(s: GameState, buffs: Buff[] = []): Stats {
     st.atk = weaponAtk(w);
     const cls = itemDef(w.def).weapon!.cls;
     st.dmgPct += 2 * (classLevel(s.hero.classXp[cls]) - 1);
+    for (const tal of activeTalents(s, cls)) if (tal.stats) for (const [k, v] of Object.entries(tal.stats)) (st as any)[k] += v as number;
   } else st.atk = 4; // кулаки
   for (const b of buffs) (st as any)[b.stat] += b.value;
   st.crit = Math.min(0.75, st.crit);

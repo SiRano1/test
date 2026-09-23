@@ -539,6 +539,14 @@ export class Renderer {
     ctx.translate(Math.round(x), Math.round(y - e.z));
     ctx.rotate(e.angle);
     switch (e.sprite) {
+      case 'dart':
+        ctx.fillStyle = '#3a3036';
+        ctx.fillRect(-4, 0, 7, 1);
+        ctx.fillStyle = '#c8c8d8';
+        ctx.fillRect(3, 0, 2, 1);
+        ctx.fillStyle = '#a03030';
+        ctx.fillRect(-5, -1, 2, 3);
+        break;
       case 'arrow':
         ctx.fillStyle = '#8a5a33';
         ctx.fillRect(-6, 0, 10, 1);

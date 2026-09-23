@@ -50,7 +50,8 @@ export abstract class Entity {
   onRemove?(w: World): void;
 }
 
-export type Team = 'player' | 'enemy' | 'neutral';
+/** 'trap' — ловушки: бьют и героя, и чудовищ. */
+export type Team = 'player' | 'enemy' | 'neutral' | 'trap';
 
 export interface Status {
   id: StatusId;
