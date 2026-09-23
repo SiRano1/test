@@ -19,8 +19,8 @@ registerLines([
         "These past months the dead have been crawling out. The Bishop says the Seal is weakening. If you want to help this town, there's only one way — down."),
     ],
     choices: [
-      { text: L('Что меня ждёт внизу?', 'What awaits me down there?'), next: 'yorn_below' },
-      { text: L('Я справлюсь.', "I'll manage."), act: (h) => { h.give('potion_small', 2); h.toast('+2 🧪'); } },
+      { text: L('Что меня ждёт внизу?', 'What awaits me down there?'), act: (h) => h.startQuest('q_legacy'), next: 'yorn_below' },
+      { text: L('Я справлюсь.', "I'll manage."), act: (h) => { h.give('potion_small', 2); h.startQuest('q_legacy'); } },
     ],
   },
   {
@@ -33,7 +33,7 @@ registerLines([
       L('Держи пару склянок. И помни: блок в последний миг — лучшая броня. Мертвецы не любят, когда их удар отводят.',
         'Take a couple of vials. And remember: a block at the last instant is the best armour. The dead hate having their blows turned aside.'),
     ],
-    onEnd: (h) => { h.give('potion_small', 2); h.toast('+2 🧪'); },
+    onEnd: (h) => h.give('potion_small', 2),
   },
   {
     id: 'yorn_death1', npc: 'yorn', priority: 60, once: true, when: (h) => deaths(h) >= 1,
@@ -136,6 +136,7 @@ registerLines([
 
 // ─────────────────────────── Хильда ───────────────────────────
 const trade = { text: L('Торговать', 'Trade'), act: (h: H) => h.openShop('smith') };
+const sharpen = { text: L('Заточить снаряжение', 'Sharpen gear'), act: (h: H) => h.openService('sharpen') };
 const bye = { text: L('До встречи', 'Goodbye') };
 registerLines([
   {
@@ -154,15 +155,15 @@ registerLines([
       L('Никто. Мой сын Эрик мечтает о славе и лезет с деревянным мечом на стражников. Кузнецом ему не быть, а жаль — руки золотые.',
         'Nobody. My son Erik dreams of glory and pokes guardsmen with a wooden sword. He\'ll never be a smith, and it\'s a pity — hands of gold.'),
     ],
-    choices: [trade, bye],
+    choices: [trade, sharpen, bye],
   },
   {
     id: 'hilda_boss1', npc: 'hilda', priority: 60, once: true, when: (h) => boss(h, 10),
     pages: [L('Слышала, ты уложил Настоятеля. С медью за спиной? Ладно, уважаю. Покажешь осколок — сделаю скидку на железо.', "Heard you put down the Abbot. With copper on your back? Fine, I respect that. Show me the shard and I'll cut you a deal on iron.")],
-    choices: [trade, bye],
+    choices: [trade, sharpen, bye],
   },
-  { id: 'hilda_d1', npc: 'hilda', priority: 1, pages: [L('Ну? Молот стынет.', "Well? The hammer's getting cold.")], choices: [trade, bye] },
-  { id: 'hilda_d2', npc: 'hilda', priority: 1, pages: [L('Медь мягкая, железо честное, сталь — для тех, кто собирается жить долго.', 'Copper is soft, iron is honest, steel is for those who plan to live long.')], choices: [trade, bye] },
+  { id: 'hilda_d1', npc: 'hilda', priority: 1, pages: [L('Ну? Молот стынет.', "Well? The hammer's getting cold.")], choices: [trade, sharpen, bye] },
+  { id: 'hilda_d2', npc: 'hilda', priority: 1, pages: [L('Медь мягкая, железо честное, сталь — для тех, кто собирается жить долго.', 'Copper is soft, iron is honest, steel is for those who plan to live long.')], choices: [trade, sharpen, bye] },
 ]);
 
 // ─────────────────────────── Сестра Агата ───────────────────────────

@@ -210,6 +210,49 @@ add({ id: 'apple', kind: 'food', name: L('Яблоко', 'Apple'), desc: L('+12 
 add({ id: 'miner_stew', kind: 'food', name: L('Похлёбка шахтёра', "Miner's Stew"), desc: L('+60 бодрости, +40 здоровья, +10% защиты на 5 мин.', '+60 energy, +40 health, +10% defense for 5 min.'), icon: { shape: 'bowl', c1: '#a06a3a', c2: '#e0b070' }, price: 70, stack: 20, tier: 1, gender: 'f', use: { energy: 60, heal: 40, buff: { stat: 'def', value: 4, seconds: 300 } } });
 add({ id: 'game_pie', kind: 'food', name: L('Пирог с дичью', 'Game Pie'), desc: L('+50 бодрости, +50 здоровья, +15% урона на 5 мин.', '+50 energy, +50 health, +15% damage for 5 min.'), icon: { shape: 'pie', c1: '#c08040', c2: '#6a3a1a' }, price: 95, stack: 20, tier: 2, gender: 'm', use: { energy: 50, heal: 50, buff: { stat: 'dmgPct', value: 15, seconds: 300 } } });
 
+add({ id: 'herb_stew', kind: 'food', name: L('Травяная похлёбка', 'Herb Stew'), desc: L('+40 бодрости, +30 здоровья, регенерация на 5 мин.', '+40 energy, +30 health, regeneration for 5 min.'), icon: { shape: 'bowl', c1: '#5a8a3a', c2: '#a0d070' }, price: 55, stack: 20, tier: 1, gender: 'f', use: { energy: 40, heal: 30, buff: { stat: 'regen', value: 0.8, seconds: 300 } } });
+add({ id: 'pumpkin_soup', kind: 'food', name: L('Тыквенный суп', 'Pumpkin Soup'), desc: L('+70 бодрости, +60 здоровья, +10% скорости на 5 мин.', '+70 energy, +60 health, +10% speed for 5 min.'), icon: { shape: 'bowl', c1: '#d8802a', c2: '#f0b060' }, price: 110, stack: 20, tier: 2, gender: 'm', use: { energy: 70, heal: 60, buff: { stat: 'speed', value: 0.1, seconds: 300 } } });
+add({ id: 'honey_bread', kind: 'food', name: L('Медовый хлеб', 'Honey Bread'), desc: L('+45 бодрости, +3 удачи на 5 мин.', '+45 energy, +3 luck for 5 min.'), icon: { shape: 'bread', c1: '#e0b050', c2: '#a06a20' }, price: 60, stack: 30, tier: 1, gender: 'm', use: { energy: 45, heal: 10, buff: { stat: 'luck', value: 3, seconds: 300 } } });
+add({ id: 'baked_potato', kind: 'food', name: L('Печёный картофель', 'Baked Potato'), desc: L('+30 бодрости, +25 здоровья.', '+30 energy, +25 health.'), icon: { shape: 'apple', c1: '#b08040', c2: '#6a4a20' }, price: 28, stack: 30, tier: 0, gender: 'm', use: { energy: 30, heal: 25 } });
+add({ id: 'fire_tonic', kind: 'consumable', name: L('Огнеупорный эликсир', 'Fireproof Elixir'), desc: L('+50% сопротивления огню… и +6 защиты на 3 мин.', '+6 defense for 3 min, resists heat.'), icon: { shape: 'potion', c1: '#e06020', c2: '#ffb060' }, price: 90, stack: 20, tier: 2, gender: 'm', use: { buff: { stat: 'def', value: 6, seconds: 180 } } });
+add({ id: 'might_elixir', kind: 'consumable', name: L('Эликсир мощи', 'Elixir of Might'), desc: L('+20% урона на 3 мин.', '+20% damage for 3 min.'), icon: { shape: 'potion', c1: '#c03030', c2: '#ffd040' }, price: 120, stack: 20, tier: 2, gender: 'm', use: { buff: { stat: 'dmgPct', value: 20, seconds: 180 } } });
+add({ id: 'torch_oil', kind: 'consumable', name: L('Масло для факела', 'Torch Oil'), desc: L('Удача +2 на спуск: свет выхватывает тайники.', 'Luck +2 for a dive: light reveals secrets.'), icon: { shape: 'vial', c1: '#d8a040', c2: '#8a6020' }, price: 25, stack: 20, tier: 0, gender: 'n', use: { buff: { stat: 'luck', value: 2, seconds: 600 } } });
+
+// ───────────────────────────── Огород: семена и урожай ─────────────────────────────
+
+export interface CropDef {
+  seed: string;
+  crop: string;
+  seasons: number[];
+  days: number;
+  /** Можно собирать повторно раз в N дней. */
+  regrow?: number;
+  color: string;
+}
+
+const CROP_SPECS: { id: string; ru: string; en: string; seedRu: string; g: Gender; seasons: number[]; days: number; price: number; c1: string; c2: string; shape: string; kind: 'material' | 'food'; regrow?: number; use?: UseEffect }[] = [
+  { id: 'grave_moss', ru: '', en: '', seedRu: 'Споры могильного мха', g: 'm', seasons: [0, 1, 2, 3], days: 3, price: 10, c1: '#6f9e5a', c2: '#3d5e33', shape: 'herb', kind: 'material', regrow: 3 },
+  { id: 'moonwort', ru: 'Лунная полынь', en: 'Moonwort', seedRu: 'Семена лунной полыни', g: 'f', seasons: [0, 1], days: 5, price: 24, c1: '#b0c8e0', c2: '#5a7aa0', shape: 'herb', kind: 'material' },
+  { id: 'fireflower', ru: 'Огнецвет', en: 'Fireflower', seedRu: 'Семена огнецвета', g: 'm', seasons: [1], days: 6, price: 34, c1: '#ff7030', c2: '#c03a1a', shape: 'herb', kind: 'material' },
+  { id: 'frostbloom', ru: 'Морозник', en: 'Frostbloom', seedRu: 'Семена морозника', g: 'm', seasons: [2, 3], days: 7, price: 40, c1: '#a0e8ff', c2: '#4a90c0', shape: 'herb', kind: 'material' },
+  { id: 'potato', ru: 'Картофель', en: 'Potato', seedRu: 'Семенной картофель', g: 'm', seasons: [0, 2], days: 5, price: 16, c1: '#b08a50', c2: '#6a5030', shape: 'rock', kind: 'food', use: { energy: 10, heal: 5 } },
+  { id: 'turnip', ru: 'Репа', en: 'Turnip', seedRu: 'Семена репы', g: 'f', seasons: [0, 1], days: 4, price: 14, c1: '#e8e0f0', c2: '#9a5ab0', shape: 'apple', kind: 'food', use: { energy: 12, heal: 6 } },
+  { id: 'pumpkin', ru: 'Тыква', en: 'Pumpkin', seedRu: 'Семена тыквы', g: 'f', seasons: [2], days: 9, price: 60, c1: '#e08030', c2: '#8a4a10', shape: 'apple', kind: 'food', use: { energy: 25, heal: 15 } },
+  { id: 'winter_onion', ru: 'Зимний лук', en: 'Winter Onion', seedRu: 'Лук-севок', g: 'm', seasons: [3], days: 6, price: 30, c1: '#f0e8c8', c2: '#8aa040', shape: 'apple', kind: 'food', use: { energy: 14, heal: 8 } },
+  { id: 'wheat', ru: 'Пшеница', en: 'Wheat', seedRu: 'Семена пшеницы', g: 'f', seasons: [1, 2], days: 4, price: 12, c1: '#e8c860', c2: '#a08030', shape: 'herb', kind: 'material' },
+];
+
+export const CROPS: Record<string, CropDef> = {};
+for (const c of CROP_SPECS) {
+  if (!ITEMS[c.id]) {
+    add({ id: c.id, kind: c.kind, name: L(c.ru, c.en), icon: { shape: c.shape, c1: c.c1, c2: c.c2 }, price: c.price, stack: 99, tier: 1, gender: c.g, tags: ['crop', c.kind === 'material' ? 'herb' : 'veg'], use: c.use });
+  }
+  const seedId = `seed_${c.id}`;
+  const seedEn = `${ITEMS[c.id]!.name.en} Seeds`;
+  add({ id: seedId, kind: 'seed', name: L(c.seedRu, seedEn), desc: L(`Растёт ${c.days} дн.`, `Grows in ${c.days} days.`), icon: { shape: 'dust', c1: '#a08050', c2: c.c1 }, price: Math.max(5, Math.round(c.price * 0.4)), stack: 99, tier: 0, gender: 'p', tags: ['seed'] });
+  CROPS[seedId] = { seed: seedId, crop: c.id, seasons: c.seasons, days: c.days, regrow: c.regrow, color: c.c1 };
+}
+
 // ───────────────────────────── Сюжетные ─────────────────────────────
 
 const SHARD_NAMES = ['Катакомб', 'Затопленных шахт', 'Грибного леса', 'Кузен гномов', 'Ледяной библиотеки', 'Пылающего собора', 'Тронного зала'];

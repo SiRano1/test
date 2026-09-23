@@ -61,6 +61,8 @@ const SFX: Record<string, Part[]> = {
   summon: [{ wave: 'sawtooth', f0: 80, f1: 160, dur: 0.5, vol: 0.12 }, { noise: true, dur: 0.4, vol: 0.12, lp: 600 }],
   roar: [{ wave: 'sawtooth', f0: 110, f1: 60, dur: 0.9, vol: 0.25 }, { noise: true, dur: 0.8, vol: 0.2, lp: 500 }],
   ui: [{ wave: 'square', f0: 700, dur: 0.03, vol: 0.05 }],
+  thunder: [{ noise: true, dur: 1.8, vol: 0.35, lp: 400, lp1: 60 }, { noise: true, dur: 1.2, vol: 0.25, lp: 900, lp1: 100, delay: 0.15 }],
+  craft: [{ wave: 'square', f0: 900, f1: 600, dur: 0.05, vol: 0.08 }, { noise: true, dur: 0.08, vol: 0.2, hp: 2000, delay: 0.06 }],
   uiback: [{ wave: 'square', f0: 500, dur: 0.03, vol: 0.05 }],
 };
 

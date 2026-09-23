@@ -26,6 +26,8 @@ export const Tile = {
   RUBBLE: 21,
   DEEPWATER: 22,
   GRAVE_DIRT: 23,
+  /** Мелкая вода: проходима, замедляет. */
+  SHALLOW: 24,
 } as const;
 export type TileId = (typeof Tile)[keyof typeof Tile];
 
@@ -61,6 +63,7 @@ def(Tile.FENCE, true, false);
 def(Tile.RUBBLE, false);
 def(Tile.DEEPWATER, true, false);
 def(Tile.GRAVE_DIRT, false);
+def(Tile.SHALLOW, false);
 
 export const tileSolid = (id: number) => INFO[id]?.solid ?? true;
 export const tileOpaque = (id: number) => INFO[id]?.opaque ?? true;
@@ -121,6 +124,11 @@ export class TileMap {
     const i = ty * this.w + tx;
     const t = this.tiles[i]!;
     return t === Tile.WALL || t === Tile.IWALL || t === Tile.VOID || t === Tile.CRACKED || this.blockers[i]! > 0;
+  }
+
+  /** Замедление на тайле под ногами (мелкая вода). */
+  groundMul(x: number, y: number): number {
+    return this.get(Math.floor(x / TILE), Math.floor(y / TILE)) === Tile.SHALLOW ? 0.7 : 1;
   }
 
   opaque(tx: number, ty: number): boolean {

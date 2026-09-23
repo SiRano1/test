@@ -12,6 +12,15 @@ export interface DialogueHost {
   healFull(): void;
   toast(text: string, color?: string): void;
   friendship(npc: string, delta: number): void;
+  hearts(npc: string): number;
+  startQuest(id: string): void;
+  questActive(id: string): boolean;
+  questDone(id: string): boolean;
+  openBuild(): void;
+  openService(kind: 'sharpen' | 'enchant' | 'reroll'): void;
+  rep(f: 'church' | 'mages' | 'traders' | 'watch', delta: number): void;
+  learnRecipe(id: string): void;
+  hasItem(def: string, n?: number): boolean;
 }
 
 export interface DChoice {

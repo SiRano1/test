@@ -51,9 +51,10 @@ function run(seed: number): RunStats {
   const startFloor = Number(process.env.START ?? 1);
   if (process.env.KIT) {
     // «подготовленный игрок»: медное снаряжение, уровень и зелья
-    g.state.equipment.weapon = { uid: 'k1', def: 'copper_sword', qty: 1, rarity: 1, affixes: [{ id: 'sharp', value: 8 }], upgrade: 0 };
-    g.state.equipment.body = { uid: 'k2', def: 'copper_body', qty: 1, rarity: 0, affixes: [], upgrade: 0 };
-    g.state.equipment.head = { uid: 'k3', def: 'copper_head', qty: 1, rarity: 0, affixes: [], upgrade: 0 };
+    const metal = process.env.METAL ?? 'copper';
+    g.state.equipment.weapon = { uid: 'k1', def: `${metal}_sword`, qty: 1, rarity: 1, affixes: [{ id: 'sharp', value: 8 }], upgrade: 0 };
+    g.state.equipment.body = { uid: 'k2', def: `${metal}_body`, qty: 1, rarity: 0, affixes: [], upgrade: 0 };
+    g.state.equipment.head = { uid: 'k3', def: `${metal}_head`, qty: 1, rarity: 0, affixes: [], upgrade: 0 };
     g.state.hero.level = Number(process.env.KIT);
     g.give('potion_small', 6);
     g.refreshStats();

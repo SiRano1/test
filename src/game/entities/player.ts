@@ -229,7 +229,7 @@ export class Player extends Actor {
   }
 
   private move(w: World, inp: InputFrame, dt: number, mul: number): void {
-    const sp = WALK_SPEED * this.stats.speed * this.moveMul() * mul;
+    const sp = WALK_SPEED * this.stats.speed * this.moveMul() * mul * w.map.groundMul(this.x, this.y);
     this.moving = inp.mx !== 0 || inp.my !== 0;
     if (this.moving) {
       w.map.move(this, inp.mx * sp * dt, inp.my * sp * dt);

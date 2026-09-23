@@ -160,7 +160,7 @@ add({
 
 add({
   id: 'loyalist', name: L('Шахтёр-лоялист', 'Loyalist Miner'), sprite: 'ghost', tier: 2,
-  hp: 150, atk: 16, def: 5, speed: 44, xp: 45, gold: [15, 30], hw: 5, hh: 4, poise: 0.8, mass: 2, flyer: true,
+  hp: 130, atk: 12, def: 5, speed: 40, xp: 45, gold: [15, 30], hw: 5, hh: 4, poise: 0.8, mass: 2, flyer: true,
   ai: 'melee', aggro: 9, undead: true, elite: true, threat: 6, light: { r: 26, color: '#7fd0c0' },
   attacks: [
     { id: 'pick', kind: 'arc', dmg: 1.3, range: 24, radius: 28, arc: 1.2, windup: 0.6, active: 0.15, recover: 0.6, cooldown: 0.6, weight: 3 },
@@ -171,7 +171,7 @@ add({
 
 add({
   id: 'gorm', name: L('Старшина Горм, Утопленник', 'Foreman Gorm, the Drowned'), sprite: 'gorm', tier: 2,
-  hp: 1100, atk: 20, def: 8, speed: 40, xp: 550, gold: [260, 360], hw: 9, hh: 6, poise: 1, mass: 7,
+  hp: 850, atk: 16, def: 7, speed: 40, xp: 550, gold: [260, 360], hw: 9, hh: 6, poise: 1, mass: 7,
   ai: 'boss', aggro: 20, undead: true, boss: true, threat: 0, light: { r: 36, color: '#6ab0c0' },
   attacks: [
     { id: 'pickaxe', kind: 'arc', dmg: 1.2, range: 30, radius: 36, arc: 1.2, windup: 0.7, active: 0.15, recover: 0.6, cooldown: 0.5, weight: 3 },

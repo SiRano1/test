@@ -602,6 +602,51 @@ function furniture(name: string, size: string): Art {
       g.rect(0, y0 - 4, W, H - y0 + 4, WOOD).rect(0, y0 - 4, W, 3, WOOD_L).rect(0, H - 3, W, 3, WOOD_S);
       for (let x = 8; x < W; x += 16) g.rect(x, y0, 1, H - y0 - 3, WOOD_S);
       break;
+    case 'chest_home':
+      g.rect(1, y0 - 2, W - 2, H - y0, '#7a4a28').rect(1, y0 - 4, W - 2, 4, '#9a6038').rect(1, y0, W - 2, 1, '#4a2a18');
+      g.rect(W / 2 - 1, y0, 2, 3, '#e0c060').rect(1, y0 - 4, 1, H - y0 + 4, '#c8a040').rect(W - 2, y0 - 4, 1, H - y0 + 4, '#c8a040');
+      break;
+    case 'stove':
+      g.rect(0, y0 - 6, W, H - y0 + 6, '#5a5058').rect(0, y0 - 6, W, 2, '#7a7078').rect(3, y0, 10, 8, '#1a1010').rect(5, y0 + 4, 6, 3, '#ff7030').rect(6, y0 + 3, 4, 2, '#ffd040');
+      g.ellipse(W - 13, y0 - 10, 10, 6, '#3a3a40').rect(W - 12, y0 - 8, 8, 2, '#6a6a72');
+      break;
+    case 'furnace':
+      g.rect(0, 0, W, H, '#6a5a58').rect(2, 2, W - 4, 3, '#8a7a78').rect(6, y0 + 2, W - 12, H - y0 - 4, '#1a0e0a');
+      g.rect(8, H - 8, W - 16, 4, '#ff6020').rect(10, H - 10, W - 20, 3, '#ffc040').rect(W / 2 - 3, 0, 6, 4, '#4a3a38');
+      break;
+    case 'alchemy_table':
+      g.rect(0, y0, W, 6, WOOD_L).rect(0, y0 + 6, W, 2, WOOD_S).rect(2, y0 + 8, 2, H - y0 - 8, WOOD_S).rect(W - 4, y0 + 8, 2, H - y0 - 8, WOOD_S);
+      g.ellipse(3, y0 - 8, 7, 9, '#a8e0ff').ellipse(4, y0 - 5, 5, 5, '#60e080').rect(5, y0 - 10, 3, 3, '#d8e8f0');
+      g.ellipse(14, y0 - 6, 6, 7, '#d8e8f0').ellipse(15, y0 - 4, 4, 4, '#e04860').rect(22, y0 - 7, 4, 7, '#c8a870');
+      break;
+    case 'potion_shelf': {
+      g.rect(0, 0, W, H, WOOD_S).rect(1, 1, W - 2, H - 2, '#3a2418');
+      for (let y = 6; y < H; y += 8) g.rect(1, y, W - 2, 2, WOOD);
+      const cols = ['#e04848', '#48c060', '#4870e0', '#c0e040', '#c07bff'];
+      for (let y = 0; y < H - 6; y += 8) for (let x = 2; x < W - 3; x += 4) g.rect(x, y + 2, 3, 4, cols[(x + y) % 5]!).set(x + 1, y + 1, '#d8e8f0');
+      break;
+    }
+    case 'cauldron':
+      g.ellipse(0, y0 - 2, W, H - y0 + 2, '#2a2a30').ellipse(2, y0 - 4, W - 4, 6, '#60e080').set(5, y0 - 2, '#c0ffc0').set(9, y0 - 3, '#c0ffc0');
+      break;
+    case 'stage':
+      g.rect(0, y0 + 2, W, H - y0 - 2, '#6a3a2a').rect(0, y0 + 2, W, 2, '#8a5a3a').rect(0, 0, 2, y0 + 2, '#8a2a3a').rect(W - 2, 0, 2, y0 + 2, '#8a2a3a');
+      return art([g], W / 2, H);
+    case 'map_table':
+      g.rect(0, y0 - 2, W, 8, WOOD).rect(2, y0 - 1, W - 4, 5, '#d8c890').line(6, y0, 14, y0 + 3, '#8a3a2a').line(20, y0 + 1, 30, y0 + 2, '#3a5a8a');
+      g.rect(2, y0 + 6, 2, H - y0 - 6, WOOD_S).rect(W - 4, y0 + 6, 2, H - y0 - 6, WOOD_S);
+      break;
+    case 'magic_circle':
+      g.ellipse(2, y0, W - 4, H - y0 - 2, '#3a2a5a').ellipse(5, y0 + 3, W - 10, H - y0 - 8, '#241a3a');
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        g.set(Math.round(W / 2 + Math.cos(a) * (W / 2 - 4)), Math.round(y0 + (H - y0) / 2 + Math.sin(a) * ((H - y0) / 2 - 3)), '#b090ff');
+      }
+      return art([g], W / 2, H);
+    case 'crystal':
+      g.rect(4, H - 4, 8, 4, '#5a4a6a').line(8, y0 - 6, 12, y0 + 2, '#80c0ff').line(8, y0 - 6, 4, y0 + 2, '#80c0ff');
+      g.ellipse(4, y0 - 6, 8, 12, '#80c0ff').ellipse(6, y0 - 4, 3, 5, '#e0f0ff');
+      break;
     default:
       g.rect(0, y0, W, H - y0, '#8a8a8a');
   }

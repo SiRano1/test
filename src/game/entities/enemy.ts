@@ -301,7 +301,7 @@ export class Enemy extends Actor {
 
   protected approach(w: World, dt: number, d: number): void {
     const p = w.player!;
-    const sp = this.def.speed * this.moveMul();
+    const sp = this.def.speed * this.moveMul() * (this.flyer ? 1 : w.map.groundMul(this.x, this.y));
     let tx = p.x, ty = p.y;
     const keep = this.def.keepDistance;
     let dirSign = 1;

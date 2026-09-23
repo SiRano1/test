@@ -152,6 +152,16 @@ export function generateFloor(seed: number, floor: number): FloorLayout {
 
   cullWalls(map);
 
+  // Затопленные шахты: в части комнат стоит мелкая вода
+  if (floor > 10 && floor <= 20) {
+    for (const r of rooms) {
+      if (r.role === 'start' || !rng.chance(0.45)) continue;
+      const pw = rng.int(3, Math.max(3, r.w - 1)), ph = rng.int(2, Math.max(2, r.h - 1));
+      const px = rng.int(r.x, r.x + r.w - pw), py = rng.int(r.y, r.y + r.h - ph);
+      flood(map, px, py, pw, ph);
+    }
+  }
+
   // Тайник: маленькая комната за треснувшей стеной
   const cracked: [number, number][] = [];
   if (rng.chance(0.55)) placeSecret(map, rng, rooms, cracked);
@@ -192,8 +202,18 @@ function placeSecret(map: TileMap, rng: Rng, rooms: Room[], cracked: [number, nu
   }
 }
 
+/** Эллиптическая лужа мелкой воды поверх пола. */
+function flood(map: TileMap, x: number, y: number, w: number, h: number) {
+  const cx0 = x + w / 2 - 0.5, cy0 = y + h / 2 - 0.5;
+  for (let j = y; j < y + h; j++)
+    for (let i = x; i < x + w; i++) {
+      if (((i - cx0) / (w / 2)) ** 2 + ((j - cy0) / (h / 2)) ** 2 > 1.1) continue;
+      if (map.get(i, j) === Tile.FLOOR) map.set(i, j, Tile.SHALLOW);
+    }
+}
+
 /** Рукотворный этаж босса: прихожая снизу, арена сверху. */
-export function generateBossFloor(): FloorLayout {
+export function generateBossFloor(floor = 10): FloorLayout {
   const W = 40, H = 36;
   const map = new TileMap(W, H, Tile.WALL);
   const arena = { x: 8, y: 4, w: 24, h: 16 };
@@ -204,6 +224,13 @@ export function generateBossFloor(): FloorLayout {
   // колонны по краям арены
   for (const [px, py] of [[11, 7], [28, 7], [11, 16], [28, 16]] as const) map.fillRect(px, py, 1, 1, Tile.WALL);
   cullWalls(map);
+  if (floor === 20) {
+    // арена Горма залита водой по краям
+    flood(map, 8, 4, 8, 6);
+    flood(map, 24, 4, 8, 6);
+    flood(map, 8, 14, 8, 6);
+    flood(map, 24, 14, 8, 6);
+  }
   const rooms: Room[] = [
     { id: 0, ...ante, role: 'start', depth: 0 },
     { id: 1, ...arena, role: 'boss', depth: 20 },

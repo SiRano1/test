@@ -8,7 +8,9 @@ import { Npc } from '../../game/entities/npc';
 import { Pickup } from '../../game/entities/pickup';
 import { Player } from '../../game/entities/player';
 import { Projectile } from '../../game/entities/projectile';
-import { CrackedWall, Prop, Spot, Trigger } from '../../game/entities/props';
+import { CrackedWall, GardenPlot, Prop, Spot, Trigger } from '../../game/entities/props';
+import { CROPS } from '../../data/items';
+import { growthStage } from '../../game/systems/garden';
 import type { Game } from '../../game/game';
 import { duskTint, townDarkness } from '../../game/systems/calendar';
 import type { World } from '../../game/world';
@@ -120,6 +122,7 @@ export class Renderer {
 
     this.particles.draw(ctx, cx, cy);
     this.drawLighting(game, cx, cy);
+    this.drawWeather(game, game.busy ? 0 : dt);
     for (const e of sorted) if (e instanceof Enemy && !e.dead && e.hp < e.maxHp && !(e instanceof Boss)) this.drawHpBar(e, cx, cy);
 
     // экранные эффекты
@@ -277,6 +280,7 @@ export class Renderer {
       ctx.stroke();
       return;
     }
+    if (e instanceof GardenPlot) return this.drawPlot(e, x, y);
     if (e instanceof Spot || e instanceof Trigger) return;
     if (e instanceof CrackedWall) {
       const art = this.bank.prop('cracked');
@@ -289,6 +293,110 @@ export class Renderer {
       const f = art.fps ? Math.floor((this.time + e.id * 0.37) * art.fps) % art.frames.length : 0;
       this.blit(art.frames[f]!, x, y, art.ax, art.ay, false, e.flash);
       void w;
+    }
+  }
+
+  private drawPlot(e: GardenPlot, x: number, y: number): void {
+    const p = this.game?.state.manor.garden[e.index];
+    if (!p) return;
+    const ctx = this.ctx;
+    const X = Math.round(x) - 8, Y = Math.round(y) - 8;
+    if (p.watered) {
+      ctx.fillStyle = 'rgba(30,20,10,0.35)';
+      ctx.fillRect(X + 1, Y + 1, 14, 14);
+    }
+    const st = growthStage(p);
+    if (st < 0) return;
+    const c = CROPS[p.seed!];
+    const green = '#4a9a3a', dark = '#2e6a28';
+    ctx.fillStyle = green;
+    if (st === 0) {
+      ctx.fillRect(X + 7, Y + 9, 2, 3);
+      ctx.fillRect(X + 6, Y + 8, 1, 1);
+      ctx.fillRect(X + 9, Y + 8, 1, 1);
+    } else if (st === 1) {
+      ctx.fillRect(X + 7, Y + 6, 2, 7);
+      ctx.fillRect(X + 4, Y + 7, 3, 2);
+      ctx.fillRect(X + 9, Y + 5, 3, 2);
+    } else {
+      ctx.fillStyle = dark;
+      ctx.fillRect(X + 3, Y + 5, 10, 8);
+      ctx.fillStyle = green;
+      ctx.fillRect(X + 4, Y + 3, 3, 7);
+      ctx.fillRect(X + 9, Y + 2, 3, 8);
+      ctx.fillRect(X + 6, Y + 1, 3, 10);
+      if (st === 3 && c) {
+        ctx.fillStyle = c.color;
+        ctx.fillRect(X + 4, Y + 3, 3, 3);
+        ctx.fillRect(X + 9, Y + 5, 3, 3);
+        ctx.fillRect(X + 6, Y + 8, 3, 3);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(X + 4, Y + 3, 1, 1);
+      }
+    }
+  }
+
+  private drops: { x: number; y: number; v: number; l: number }[] = [];
+  private flakes: { x: number; y: number; vx: number; vy: number; s: number }[] = [];
+  private lightningT = 0;
+
+  /** Дождь, гроза, снег, туман — только на улице. */
+  private drawWeather(game: Game, dt: number): void {
+    const w = game.world;
+    const weather = game.state.time.weather;
+    const ctx = this.ctx;
+    if (w.kind !== 'town') {
+      this.drops = [];
+      this.flakes = [];
+      return;
+    }
+    if (weather === 'rain' || weather === 'storm') {
+      ctx.fillStyle = 'rgba(30,40,60,0.18)';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+      const n = weather === 'storm' ? 9 : 5;
+      for (let i = 0; i < n; i++) this.drops.push({ x: Math.random() * (VIEW_W + 60) - 30, y: -10, v: 300 + Math.random() * 120, l: 5 + Math.random() * 5 });
+      ctx.strokeStyle = 'rgba(170,200,230,0.55)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const d of this.drops) {
+        d.y += d.v * dt;
+        d.x -= d.v * 0.25 * dt;
+        ctx.moveTo(Math.round(d.x), Math.round(d.y));
+        ctx.lineTo(Math.round(d.x + d.l * 0.25), Math.round(d.y - d.l));
+      }
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(200,220,240,0.5)';
+      for (const d of this.drops) if (d.y > VIEW_H * (0.3 + (d.l / 10) * 0.7)) ctx.fillRect(Math.round(d.x) - 1, Math.round(d.y), 3, 1);
+      this.drops = this.drops.filter((d) => d.y < VIEW_H * (0.3 + (d.l / 10) * 0.7));
+      if (weather === 'storm') {
+        this.lightningT -= dt;
+        if (this.lightningT <= 0) {
+          this.lightningT = 6 + Math.random() * 10;
+          this.flash('#e8f0ff', 0.25);
+          game.events.emit('fx', { t: 'sfx', id: 'thunder' });
+        }
+      }
+    } else if (weather === 'snow') {
+      for (let i = 0; i < 2; i++) this.flakes.push({ x: Math.random() * VIEW_W, y: -4, vx: (Math.random() - 0.5) * 20, vy: 20 + Math.random() * 25, s: Math.random() < 0.3 ? 2 : 1 });
+      ctx.fillStyle = 'rgba(255,255,255,0.85)';
+      for (const f of this.flakes) {
+        f.y += f.vy * dt;
+        f.x += (f.vx + Math.sin(this.time * 2 + f.y * 0.05) * 10) * dt;
+        ctx.fillRect(Math.round(f.x), Math.round(f.y), f.s, f.s);
+      }
+      this.flakes = this.flakes.filter((f) => f.y < VIEW_H + 4);
+    } else if (weather === 'fog') {
+      for (let i = 0; i < 4; i++) {
+        const fx = ((this.time * (6 + i * 3) + i * 140) % (VIEW_W + 300)) - 150;
+        const fy = 40 + i * 60;
+        const g = ctx.createRadialGradient(fx, fy, 10, fx, fy, 160);
+        g.addColorStop(0, 'rgba(200,205,215,0.28)');
+        g.addColorStop(1, 'rgba(200,205,215,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(fx - 160, fy - 160, 320, 320);
+      }
+      ctx.fillStyle = 'rgba(190,195,205,0.12)';
+      ctx.fillRect(0, 0, VIEW_W, VIEW_H);
     }
   }
 

@@ -38,7 +38,15 @@ export interface SaveMeta {
 
 /** Миграции: версия → функция, поднимающая данные до следующей версии. */
 const MIGRATIONS: Record<number, (d: any) => any> = {
-  // 1 → 2: пример будущей миграции
+  // 1 → 2: усадьба, задания, рецепты, подарки, ротация лавки
+  1: (d) => ({
+    ...d,
+    economy: { demand: d.economy?.demand ?? {}, rotating: [] },
+    manor: { upgrades: [], building: null, garden: [] },
+    quests: {},
+    recipes: [],
+    giftLog: {},
+  }),
 };
 
 export function migrate(data: any): GameState {
@@ -50,7 +58,12 @@ export function migrate(data: any): GameState {
     data.version = v;
   }
   // дефолты для полей, добавленных без смены версии
-  data.economy ??= { demand: {} };
+  data.economy ??= { demand: {}, rotating: [] };
+  data.economy.rotating ??= [];
+  data.manor ??= { upgrades: [], building: null, garden: [] };
+  data.quests ??= {};
+  data.recipes ??= [];
+  data.giftLog ??= {};
   data.flags ??= {};
   data.stats ??= {};
   data.location ??= { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 };

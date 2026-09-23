@@ -58,14 +58,42 @@ export interface GameState {
   factions: Record<FactionId, number>;
   flags: Record<string, boolean>;
   stats: Record<string, number>;
-  economy: { demand: Record<string, number> };
+  economy: { demand: Record<string, number>; rotating: ItemStack[] };
+  manor: ManorState;
+  quests: Record<string, QuestState>;
+  /** Выученные рецепты (кроме известных с начала). */
+  recipes: string[];
+  /** Узнанные реакции на подарки: npc → item → реакция. */
+  giftLog: Record<string, Record<string, GiftReaction>>;
   /** Где герой находится (для загрузки). Подземелье не сохраняется — загрузка у склепа. */
   location: { scene: SceneRef; x: number; y: number };
   playtime: number;
   settings: { lang: 'ru' | 'en'; volume: number; shake: boolean };
 }
 
-export const SAVE_VERSION = 1;
+export type GiftReaction = 'love' | 'like' | 'neutral' | 'dislike' | 'hate';
+
+export interface PlotState {
+  seed: string | null;
+  days: number;
+  watered: boolean;
+  ready: boolean;
+}
+
+export interface ManorState {
+  upgrades: string[];
+  building: { id: string; daysLeft: number } | null;
+  garden: PlotState[];
+}
+
+export interface QuestState {
+  status: 'active' | 'done';
+  progress: number;
+  /** Начальное значение счётчика (для заданий «убить N»). */
+  base: number;
+}
+
+export const SAVE_VERSION = 2;
 export const INVENTORY_SIZE = 36;
 export const STORAGE_SIZE = 36;
 export const QUICK_SLOTS = 4;
@@ -91,7 +119,11 @@ export function newGameState(name: string, seed: number): GameState {
     factions: { church: 0, mages: 0, traders: 0, watch: 0 },
     flags: {},
     stats: {},
-    economy: { demand: {} },
+    economy: { demand: {}, rotating: [] },
+    manor: { upgrades: [], building: null, garden: [] },
+    quests: {},
+    recipes: [],
+    giftLog: {},
     location: { scene: { kind: 'interior', id: 'manor' }, x: -1, y: -1 },
     playtime: 0,
     settings: { lang: 'ru', volume: 0.6, shake: true },

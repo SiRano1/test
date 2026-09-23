@@ -201,6 +201,7 @@ function paintDungeonTile(ctx: Ctx, map: TileMap, tx: number, ty: number, x: num
   switch (id) {
     case Tile.FLOOR:
     case Tile.RUBBLE:
+    case Tile.SHALLOW:
     case Tile.STAIRS_DOWN:
     case Tile.STAIRS_UP: {
       const base = P.floor[Math.floor(h * 3)]!;
@@ -227,6 +228,19 @@ function paintDungeonTile(ctx: Ctx, map: TileMap, tx: number, ty: number, x: num
       if (isWallish(map.get(tx - 1, ty))) {
         ctx.fillStyle = 'rgba(0,0,0,0.2)';
         ctx.fillRect(x, y, 2, 16);
+      }
+      if (id === Tile.SHALLOW) {
+        ctx.fillStyle = 'rgba(40,100,140,0.55)';
+        ctx.fillRect(x, y, 16, 16);
+        ctx.fillStyle = 'rgba(160,210,240,0.35)';
+        ctx.fillRect(x + 2 + Math.floor(h * 8), y + 4, 5, 1);
+        ctx.fillRect(x + 8 - Math.floor(h * 5), y + 11, 4, 1);
+        const edge = 'rgba(200,230,250,0.45)';
+        ctx.fillStyle = edge;
+        if (map.get(tx, ty - 1) !== Tile.SHALLOW) ctx.fillRect(x, y, 16, 1);
+        if (map.get(tx - 1, ty) !== Tile.SHALLOW) ctx.fillRect(x, y, 1, 16);
+        if (map.get(tx + 1, ty) !== Tile.SHALLOW) ctx.fillRect(x + 15, y, 1, 16);
+        if (map.get(tx, ty + 1) !== Tile.SHALLOW) ctx.fillRect(x, y + 15, 16, 1);
       }
       if (id === Tile.RUBBLE) {
         ctx.fillStyle = shade(P.wall, -0.1);

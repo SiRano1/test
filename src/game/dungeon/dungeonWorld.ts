@@ -18,7 +18,7 @@ export function buildDungeon(game: GameApi, floor: number): { world: World; spaw
   const seed = hashSeed(s.seed, 'floor', floor, s.time.totalDays);
   const tier = tierForFloor(floor);
   const bossFloor = isBossFloor(floor);
-  const layout = bossFloor ? generateBossFloor() : generateFloor(seed, floor);
+  const layout = bossFloor ? generateBossFloor(floor) : generateFloor(seed, floor);
   const w = new World(game, 'dungeon', layout.map, seed ^ 0x5bd1e995, `tier${tier.id}`);
   w.floor = floor;
   w.tier = tier;

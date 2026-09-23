@@ -42,6 +42,11 @@ export interface GameApi {
   bossDefeated(floor: number): void;
   setBoss(e: Actor | null): void;
   markRunLoot(uid: string): void;
+  openCrafting(station: import('../data/recipes').Station): void;
+  openStorage(): void;
+  counter(npc: string): void;
+  plotAction(index: number): void;
+  plotLabel(index: number): string;
 }
 
 /** Интерфейс ломаемых объектов (урны, жилы, треснувшие стены). */

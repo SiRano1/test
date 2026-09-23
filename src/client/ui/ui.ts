@@ -6,7 +6,16 @@ import { SHOPS } from '../../data/shops';
 import { S, tr, type StrKey } from '../../data/strings';
 import { tierForFloor } from '../../data/tiers';
 import { formatTime } from '../../core/math';
-import type { Game } from '../../game/game';
+import type { Game, ItemRef } from '../../game/game';
+import { STATION_NAMES } from '../../data/recipes';
+import { UPGRADES } from '../../data/manor';
+import { QUESTS } from '../../data/quests';
+import { NPCS } from '../../data/npcs';
+import { REACTION_LABEL } from '../../game/systems/relations';
+import { hearts } from '../../game/state';
+import { countItem } from '../../game/systems/inventory';
+import { rotatingPrice } from '../../game/systems/economy';
+import { SEASONS } from '../../game/systems/calendar';
 import { WEATHER_ICONS, seasonName, weekday } from '../../game/systems/calendar';
 import { formatAffix, itemName, RARITY_NAMES } from '../../game/systems/loot';
 import { classLevel, classXpToNext, xpToNext } from '../../game/systems/stats';
@@ -23,7 +32,7 @@ export interface UiCallbacks {
   settingsChanged(): void;
 }
 
-type MenuTab = 'inv' | 'skills' | 'chronicle' | 'settings';
+type MenuTab = 'inv' | 'skills' | 'quests' | 'relations' | 'chronicle' | 'settings';
 
 const SLOT_LABEL: Record<EquipSlot, Loc> = {
   weapon: L('Оружие', 'Weapon'), weapon2: L('Запас', 'Spare'), head: L('Шлем', 'Head'), body: L('Тело', 'Body'),
@@ -60,6 +69,10 @@ export class Ui {
   private pauseEl: HTMLElement;
   private elevatorEl: HTMLElement;
   private dayEl: HTMLElement;
+  private panelEl: HTMLElement;
+  private giftEl: HTMLElement;
+  private serviceSel: ItemRef | null = null;
+  private buildMsg = '';
   menuTab: MenuTab = 'inv';
   menuOpen = false;
   pauseOpen = false;
@@ -85,7 +98,9 @@ export class Ui {
     this.pauseEl = h('div', { class: 'overlay dim hidden' });
     this.elevatorEl = h('div', { class: 'panel interactive hidden', style: 'left:170px;right:170px;top:40px' });
     this.dayEl = h('div', {});
-    root.append(this.hud, this.dialogueEl, this.menuEl, this.shopEl, this.loreEl, this.elevatorEl, this.dayEl, this.overlayEl, this.pauseEl, this.titleEl);
+    this.panelEl = h('div', { class: 'panel interactive hidden', style: 'left:20px;right:20px;top:14px;bottom:14px;display:flex;flex-direction:column' });
+    this.giftEl = h('div', { class: 'panel interactive hidden', style: 'left:110px;right:110px;top:40px' });
+    root.append(this.hud, this.dialogueEl, this.menuEl, this.shopEl, this.panelEl, this.loreEl, this.elevatorEl, this.giftEl, this.dayEl, this.overlayEl, this.pauseEl, this.titleEl);
     this.buildHud();
   }
 
@@ -113,6 +128,8 @@ export class Ui {
       ev.on('death', (d) => this.showDeath(d.gold, d.items, d.exhausted)),
       ev.on('dayStart', (d) => this.dayText(d.text)),
       ev.on('boss', () => this.renderBoss()),
+      ev.on('panel', () => this.renderPanel()),
+      ev.on('tierEnter', (e) => this.dayText(`${tr('tierTitle', { n: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][e.tier - 1] ?? e.tier })} · ${t(tierForFloor(e.tier * 10 - 9).name)}`)),
       ev.on('scene', () => {
         this.renderQuick();
         this.renderFloorLabel();
@@ -127,7 +144,7 @@ export class Ui {
     );
     this.renderQuick();
     this.renderFloorLabel();
-    for (const el of [this.dialogueEl, this.menuEl, this.shopEl, this.loreEl, this.overlayEl, this.pauseEl, this.elevatorEl]) show(el, false);
+    for (const el of [this.dialogueEl, this.menuEl, this.shopEl, this.loreEl, this.overlayEl, this.pauseEl, this.elevatorEl, this.panelEl, this.giftEl]) show(el, false);
   }
 
   detach(): void {
@@ -135,7 +152,7 @@ export class Ui {
     this.unsub = [];
     this.game = null;
     show(this.hud, false);
-    for (const el of [this.dialogueEl, this.menuEl, this.shopEl, this.loreEl, this.overlayEl, this.pauseEl, this.elevatorEl]) show(el, false);
+    for (const el of [this.dialogueEl, this.menuEl, this.shopEl, this.loreEl, this.overlayEl, this.pauseEl, this.elevatorEl, this.panelEl, this.giftEl]) show(el, false);
   }
 
   /** Пауза игры из-за открытого интерфейса. */
@@ -308,6 +325,8 @@ export class Ui {
       );
       this.dialogueEl.append(list);
     } else if (done) this.dialogueEl.append(h('div', { class: 'more' }, '▼'));
+    if (done && d.line.id !== 'gift' && !d.line.id.startsWith('thanks') && g.canGift(d.npc))
+      this.dialogueEl.append(h('button', { style: 'position:absolute;right:16px;top:-9px;font-size:7px', onclick: () => this.openGiftPicker() }, `🎁 ${tr('gift')}`));
     this.dialogueEl.onclick = (e) => {
       if ((e.target as HTMLElement).tagName !== 'BUTTON') this.advanceDialogue();
     };
@@ -360,7 +379,8 @@ export class Ui {
     const g = this.game!;
     clear(this.menuEl);
     const tabs: [MenuTab, Loc][] = [
-      ['inv', S.inventory], ['skills', L('Навыки', 'Skills')], ['chronicle', L('Летопись', 'Chronicle')], ['settings', S.settings],
+      ['inv', S.inventory], ['skills', L('Навыки', 'Skills')], ['quests', S.quests], ['relations', S.relations],
+      ['chronicle', L('Летопись', 'Chronicle')], ['settings', S.settings],
     ];
     const bar = h('div', { class: 'tabs' });
     for (const [id, name] of tabs)
@@ -370,6 +390,8 @@ export class Ui {
     this.menuEl.append(bar, body);
     if (this.menuTab === 'inv') this.renderInventory(body, g);
     else if (this.menuTab === 'skills') this.renderSkills(body, g);
+    else if (this.menuTab === 'quests') this.renderQuests(body, g);
+    else if (this.menuTab === 'relations') this.renderRelations(body, g);
     else if (this.menuTab === 'chronicle') this.renderChronicle(body, g);
     else this.renderSettings(body, g);
   }
@@ -444,7 +466,7 @@ export class Ui {
     body.append(left, right);
   }
 
-  private fillDetail(el: HTMLElement, s: ItemStack, g: Game, price?: number): void {
+  private fillDetail(el: HTMLElement, s: ItemStack, g: Game, price?: number, noActions = false): void {
     const d = itemDef(s.def);
     el.append(h('div', { class: `t r${s.rarity}` }, itemName(s)));
     const sub = [t(KIND_NAMES[d.kind]!)];
@@ -459,7 +481,7 @@ export class Ui {
     }
     if (d.desc) el.append(h('div', { class: 'sub' }, t(d.desc)));
     if (price !== undefined) el.append(h('div', { class: 'gold-text' }, `${tr('price')}: ◆ ${price}`));
-    if (price !== undefined) return;
+    if (price !== undefined || noActions) return;
     const acts = h('div', { class: 'actions' });
     if (this.selEquip) acts.append(h('button', { onclick: () => g.unequip(this.selEquip!) }, tr('unequip')));
     else if (this.selInv !== null) {
@@ -493,6 +515,48 @@ export class Ui {
       'Мастерство растёт от использования: каждое попадание оружием даёт опыт его классу. Уровень класса усиливает урон этим оружием. Навык Q зависит от класса оружия в руках.',
       'Mastery grows with use: every hit grants experience to that weapon class. Class level boosts damage with that weapon. The Q skill depends on the weapon in hand.',
     ))));
+    body.append(col);
+  }
+
+  private renderQuests(body: HTMLElement, g: Game): void {
+    const s = g.state;
+    const col = h('div', { class: 'col', style: 'width:100%;overflow-y:auto' });
+    const active = QUESTS.filter((q) => s.quests[q.id]?.status === 'active');
+    const done = QUESTS.filter((q) => s.quests[q.id]?.status === 'done');
+    col.append(h('h2', null, tr('active')));
+    if (!active.length) col.append(h('div', { class: 'help' }, t(L('Нет активных заданий. Поговорите с жителями.', 'No active quests. Talk to the townsfolk.'))));
+    for (const q of active) {
+      const [a, b] = g.questProgress(q.id);
+      const giver = NPCS[q.giver];
+      col.append(h('div', { class: 'detail', style: 'min-height:0' },
+        h('div', { class: 't', style: q.main ? 'color:var(--gold)' : '' }, `${q.main ? '★ ' : ''}${t(q.title)}`),
+        h('div', null, t(q.desc)),
+        h('div', { class: 'sub' }, `${giver ? t(giver.name) : ''}${b > 1 ? ` · ${a}/${b}` : ''}`)));
+    }
+    if (done.length) {
+      col.append(h('h2', { style: 'margin-top:6px' }, tr('completed')));
+      for (const q of done) col.append(h('div', { class: 'sub', style: 'color:var(--ink-dim);font-size:7px' }, `✓ ${t(q.title)}`));
+    }
+    body.append(col);
+  }
+
+  private renderRelations(body: HTMLElement, g: Game): void {
+    const s = g.state;
+    const col = h('div', { class: 'col', style: 'width:100%;overflow-y:auto' });
+    const met = Object.keys(NPCS).filter((id) => s.flags[`dlg:${id}_meet`] || s.npcs[id]);
+    if (!met.length) col.append(h('div', { class: 'help' }, t(L('Вы ещё ни с кем не знакомы.', "You haven't met anyone yet."))));
+    for (const id of met) {
+      const n = NPCS[id]!;
+      const hs = hearts(s, id);
+      const max = n.romance ? 10 : 10;
+      const known = Object.entries(s.giftLog[id] ?? {}).filter(([, r]) => r === 'love' || r === 'like').map(([it]) => t(itemDef(it).name));
+      col.append(h('div', { class: 'row', style: 'justify-content:flex-start;gap:6px;font-size:7px' },
+        h('span', { style: 'width:120px;color:var(--ink)' }, t(n.name)),
+        h('span', { style: 'width:70px;color:var(--ink-dim)' }, t(n.role)),
+        h('span', { style: 'color:#ff8aa0;letter-spacing:0' }, '♥'.repeat(Math.min(hs, max)) + '♡'.repeat(Math.max(0, max - hs))),
+        h('span', { style: 'color:var(--ink-dim);font-size:6px' }, `${t(SEASONS[n.birthday[0]]!)} ${n.birthday[1]}`),
+        known.length ? h('span', { style: 'color:var(--st);font-size:6px' }, `${t(REACTION_LABEL.like)}: ${known.slice(0, 3).join(', ')}`) : null));
+    }
     body.append(col);
   }
 
@@ -563,6 +627,16 @@ export class Ui {
     const s = g.state;
     const detail = h('div', { class: 'detail', style: 'min-height:48px' });
     const stock = h('div', { class: 'shop-list' });
+    if (shop.rotating) {
+      stock.append(h('div', { class: 'sub', style: 'color:var(--gold)' }, tr('rareGoods')));
+      s.economy.rotating.forEach((st, i) => {
+        const price = rotatingPrice(s, st, shop);
+        stock.append(h('div', {
+          class: `shop-row ${s.hero.gold < price ? 'poor' : ''}`, onclick: () => g.buyRotating(i),
+          onmouseenter: () => { clear(detail); this.fillDetail(detail, st, g, price); },
+        }, h('img', { src: this.renderer.bank.iconUrl(st.def) }), h('span', { class: `nm r${st.rarity}` }, itemName(st)), h('span', { class: 'pr' }, `◆ ${price}`)));
+      });
+    }
     for (const it of g.shopItems()) {
       const d = itemDef(it.def);
       stock.append(h('div', {
@@ -606,6 +680,132 @@ export class Ui {
           grid, detail)),
     );
     show(this.shopEl, true);
+  }
+
+  // ───────────────────────── Панели: крафт, сундук, стройка, услуги ─────────────────────────
+
+  private renderPanel(): void {
+    const g = this.game!;
+    const m = g.mode;
+    if (m !== 'craft' && m !== 'storage' && m !== 'build' && m !== 'service') {
+      show(this.panelEl, false);
+      this.serviceSel = null;
+      return;
+    }
+    clear(this.panelEl);
+    const head = (title: string) =>
+      h('div', { class: 'row', style: 'justify-content:space-between;margin-bottom:4px' },
+        h('h2', { style: 'margin:0' }, title),
+        h('span', { class: 'gold-text num' }, `◆ ${g.state.hero.gold} · ${tr('energy')} ${Math.round(g.state.hero.energy)}`),
+        h('button', { onclick: () => g.closePanel() }, `✕ ${tr('leave')}`));
+    if (m === 'craft') this.renderCraft(g, head);
+    else if (m === 'storage') this.renderStorage(g, head);
+    else if (m === 'build') this.renderBuild(g, head);
+    else this.renderService(g, head);
+    show(this.panelEl, true);
+  }
+
+  private itemChip(def: string, have: number, need: number): HTMLElement {
+    return h('span', { class: 'row', style: `gap:1px;font-size:6px;color:${have >= need ? 'var(--ink)' : '#e07070'}` },
+      h('img', { src: this.renderer.bank.iconUrl(def), style: 'width:10px;height:10px;image-rendering:pixelated' }),
+      h('span', { class: 'num' }, `${have}/${need}`));
+  }
+
+  private renderCraft(g: Game, head: (t: string) => HTMLElement): void {
+    const list = h('div', { class: 'shop-list', style: 'width:auto;flex:1' });
+    for (const { r, missing } of g.craftList()) {
+      const [out, n] = r.output;
+      const d = itemDef(out);
+      const inputs = h('span', { class: 'row', style: 'gap:4px' });
+      for (const [id, need] of r.inputs) inputs.append(this.itemChip(id, countItem(g.state.inventory, id), need));
+      list.append(h('div', { class: `shop-row ${missing.length ? 'poor' : ''}` },
+        h('img', { src: this.renderer.bank.iconUrl(out) }),
+        h('span', { class: 'nm', style: 'flex:0 0 120px' }, `${t(d.name)}${n > 1 ? ` ×${n}` : ''}`),
+        inputs,
+        h('span', { style: 'flex:1' }),
+        h('span', { class: 'sub', style: 'font-size:6px;color:var(--ink-dim)' }, `${r.energy} ${tr('energyShort')} · ${r.minutes} ${tr('minutesShort')}`),
+        h('button', { disabled: missing.length > 0, onclick: () => g.craft(r.id) }, tr('create'))));
+    }
+    this.panelEl.append(head(t(STATION_NAMES[g.craftStation!])), list);
+  }
+
+  private renderStorage(g: Game, head: (t: string) => HTMLElement): void {
+    const grid = (src: 'inv' | 'store') => {
+      const el = h('div', { class: 'grid' });
+      const slots = src === 'inv' ? g.state.inventory : g.state.storage;
+      slots.forEach((s, i) => el.append(this.slotEl(s, { onclick: () => g.moveStorage(src, i) })));
+      return el;
+    };
+    this.panelEl.append(head(tr('storage')),
+      h('div', { style: 'display:flex;gap:10px' },
+        h('div', { class: 'col' }, h('div', { class: 'sub', style: 'color:var(--ink-dim)' }, tr('inventoryShort')), grid('inv')),
+        h('div', { class: 'col' }, h('div', { class: 'sub', style: 'color:var(--ink-dim)' }, tr('storage')), grid('store'))),
+      h('div', { class: 'help' }, t(L('Щелчок перекладывает стопку в другую сторону.', 'Click moves a stack to the other side.'))));
+  }
+
+  private renderBuild(g: Game, head: (t: string) => HTMLElement): void {
+    const m = g.state.manor;
+    const list = h('div', { class: 'col' });
+    if (m.building) list.append(h('div', { class: 'gold-text' }, tr('building', { name: t(UPGRADES.find((u) => u.id === m.building!.id)!.name), n: m.building.daysLeft })));
+    for (const u of UPGRADES) {
+      const built = m.upgrades.includes(u.id);
+      const chips = h('span', { class: 'row', style: 'gap:4px' });
+      for (const [id, need] of u.items) chips.append(this.itemChip(id, countItem(g.state.inventory, id), need));
+      list.append(h('div', { class: 'detail', style: 'min-height:0;display:flex;gap:6px;align-items:center' },
+        h('div', { style: 'flex:1' },
+          h('div', { class: 't' }, `${built ? '✓ ' : ''}${t(u.name)}`),
+          h('div', { class: 'sub' }, t(u.desc))),
+        h('span', { class: 'gold-text num' }, `◆ ${u.cost}`), chips,
+        h('button', { disabled: built || !!m.building, onclick: () => { this.buildMsg = g.orderUpgrade(u.id) ?? ''; this.renderPanel(); } }, built ? '✓' : tr('order'))));
+    }
+    if (this.buildMsg) list.append(h('div', { style: 'color:#e07070' }, this.buildMsg));
+    this.panelEl.append(head(tr('build')), list);
+  }
+
+  private renderService(g: Game, head: (t: string) => HTMLElement): void {
+    const kind = g.service!;
+    const grid = h('div', { class: 'grid' });
+    const refs: [ItemRef, ItemStack | null][] = [];
+    for (const slot of EQUIP_SLOTS) refs.push([{ equip: slot }, g.state.equipment[slot]]);
+    g.state.inventory.forEach((s, i) => refs.push([{ inv: i }, s]));
+    const same = (a: ItemRef | null, b: ItemRef) => !!a && JSON.stringify(a) === JSON.stringify(b);
+    for (const [ref, s] of refs) {
+      if (!s) continue;
+      const cost = g.serviceCost(ref);
+      const el = this.slotEl(s, { sel: same(this.serviceSel, ref), onclick: () => ((this.serviceSel = ref), this.renderPanel()) });
+      if (!cost) el.style.opacity = '0.35';
+      grid.append(el);
+    }
+    const detail = h('div', { class: 'detail' });
+    const sel = this.serviceSel ? g.refStack(this.serviceSel) : null;
+    if (sel && this.serviceSel) {
+      this.fillDetail(detail, sel, g, undefined, true);
+      const cost = g.serviceCost(this.serviceSel);
+      if (cost) {
+        const row = h('div', { class: 'row', style: 'justify-content:flex-start;gap:6px;margin-top:3px' }, h('span', { class: 'gold-text num' }, `◆ ${cost.gold}`));
+        if (cost.bar) row.append(this.itemChip(cost.bar, countItem(g.state.inventory, cost.bar), cost.bars ?? 0));
+        if (cost.chance !== undefined) row.append(h('span', null, `${tr('chance')}: ${Math.round(cost.chance * 100)}%`));
+        row.append(h('button', { onclick: () => g.applyService(this.serviceSel!) }, tr(kind)));
+        detail.append(row);
+      } else detail.append(h('div', { class: 'sub' }, t(L('С этой вещью это сделать нельзя.', "This can't be done to this item."))));
+    } else detail.append(h('div', { class: 'sub' }, t(L('Выберите вещь.', 'Choose an item.'))));
+    this.panelEl.append(head(tr(kind)), h('div', { style: 'display:flex;flex-direction:column;gap:4px' }, grid, detail));
+  }
+
+  // ───────────────────────── Подарки ─────────────────────────
+
+  private openGiftPicker(): void {
+    const g = this.game!;
+    const npc = g.dialogue?.npc;
+    if (!npc) return;
+    clear(this.giftEl);
+    const grid = h('div', { class: 'grid' });
+    g.state.inventory.forEach((s, i) => {
+      if (!s || itemDef(s.def).kind === 'quest') return;
+      grid.append(this.slotEl(s, { onclick: () => { show(this.giftEl, false); g.giveGift(npc, i); } }));
+    });
+    this.giftEl.append(h('h2', null, `${tr('gift')}: ${t(NPCS[npc]!.name)}`), grid, h('button', { style: 'margin-top:4px', onclick: () => show(this.giftEl, false) }, tr('back')));
+    show(this.giftEl, true);
   }
 
   // ───────────────────────── Лор, лифт, смерть ─────────────────────────
@@ -741,7 +941,9 @@ export class Ui {
       }
       if (c === 'Escape') {
         consumed = true;
-        if (this.menuOpen) this.toggleMenu();
+        if (!this.giftEl.classList.contains('hidden')) show(this.giftEl, false);
+        else if (g.mode === 'craft' || g.mode === 'storage' || g.mode === 'build' || g.mode === 'service') g.closePanel();
+        else if (this.menuOpen) this.toggleMenu();
         else if (g.mode === 'shop') g.closeShop();
         else if (g.mode === 'lore') g.closeLore();
         else if (g.mode === 'elevator') g.chooseElevator(null);

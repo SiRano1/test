@@ -188,6 +188,31 @@ export function door(rx: number, ry: number, rw: number, rh: number, to: SceneRe
   });
 }
 
+/** Грядка в саду усадьбы. */
+export class GardenPlot extends Entity {
+  lastLabel = '';
+
+  constructor(x: number, y: number, public index: number) {
+    super();
+    this.x = x;
+    this.y = y;
+    this.hw = 7;
+    this.hh = 6;
+    this.layer = 0;
+    this.sprite = 'plot';
+    this.interaction = {
+      label: () => this.lastLabel,
+      range: 6,
+      enabled: () => this.lastLabel !== '',
+      act: (w) => w.game.plotAction(this.index),
+    };
+  }
+
+  override update(w: World): void {
+    this.lastLabel = w.game.plotLabel(this.index);
+  }
+}
+
 /** Лор: записка или фреска. */
 export class LoreObject extends Prop {
   constructor(x: number, y: number, public loreId: string, kind: 'note' | 'fresco' | 'diary') {

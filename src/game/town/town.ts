@@ -3,8 +3,8 @@ import { hashSeed, Rng } from '../../core/rng';
 import { Tile, TileMap } from '../../core/tilemap';
 import { L, t, type Loc } from '../../data/loc';
 import { tr } from '../../data/strings';
-import { Npc } from '../entities/npc';
-import { door, Prop, Trigger } from '../entities/props';
+import { GARDEN_PLOTS } from '../../data/manor';
+import { door, GardenPlot, Prop, Trigger } from '../entities/props';
 import type { SceneRef } from '../state';
 import { World, type GameApi, type SpawnSpec } from '../world';
 
@@ -36,11 +36,15 @@ export const BUILDINGS: BuildingSpec[] = [
   { id: 'manor', name: L('Усадьба Эшгроув', 'Ashgrove Manor'), x: 47, y: 5, w: 11, h: 6, style: 'manor', wall: '#8a7a68', roof: '#4a3a3a', door: 5, interior: 'manor', roofH: 3 },
   { id: 'smithy', name: L('Кузница Хильды', "Hilda's Smithy"), x: 5, y: 19, w: 8, h: 5, style: 'stone', wall: '#8a8078', roof: '#6a3a2a', door: 3, interior: 'smithy', roofH: 3, sign: 'anvil' },
   { id: 'archive', name: L('Городской архив', 'Town Archive'), x: 44, y: 18, w: 8, h: 5, style: 'timber', wall: '#e0d4b8', roof: '#3a5a7a', door: 3, interior: 'archive', roofH: 3, sign: 'book' },
-  { id: 'alchemy', name: L('Алхимия Осберта', "Osbert's Alchemy"), x: 14, y: 19, w: 6, h: 5, style: 'timber', wall: '#d8d0b0', roof: '#3a6a4a', door: 2, roofH: 3, sign: 'potion' },
-  { id: 'tavern', name: L('Таверна «Кривой Фонарь»', 'The Crooked Lantern'), x: 12, y: 29, w: 9, h: 5, style: 'timber', wall: '#d8c8a0', roof: '#7a3a2a', door: 4, roofH: 3, sign: 'mug' },
+  { id: 'alchemy', name: L('Алхимия Осберта', "Osbert's Alchemy"), x: 14, y: 19, w: 6, h: 5, style: 'timber', wall: '#d8d0b0', roof: '#3a6a4a', door: 2, interior: 'alchemy', roofH: 3, sign: 'potion' },
+  { id: 'tavern', name: L('Таверна «Кривой Фонарь»', 'The Crooked Lantern'), x: 12, y: 29, w: 9, h: 5, style: 'timber', wall: '#d8c8a0', roof: '#7a3a2a', door: 4, interior: 'tavern', roofH: 3, sign: 'mug' },
   { id: 'trading', name: L('Торговый дом Кроу', 'House of Crowe'), x: 36, y: 29, w: 9, h: 5, style: 'stone', wall: '#b8a890', roof: '#2a2a3a', door: 4, roofH: 3, sign: 'coin' },
-  { id: 'barracks', name: L('Казармы Стражи', 'Watch Barracks'), x: 48, y: 29, w: 10, h: 5, style: 'stone', wall: '#8a8a90', roof: '#6a2a2a', door: 5, roofH: 3, sign: 'shield' },
-  { id: 'tower', name: L('Башня Серого Круга', 'Tower of the Grey Circle'), x: 56, y: 18, w: 5, h: 5, style: 'tower', wall: '#6a6a80', roof: '#3a2a5a', door: 2, roofH: 7 },
+  { id: 'barracks', name: L('Казармы Стражи', 'Watch Barracks'), x: 48, y: 29, w: 10, h: 5, style: 'stone', wall: '#8a8a90', roof: '#6a2a2a', door: 5, interior: 'barracks', roofH: 3, sign: 'shield' },
+  { id: 'tower', name: L('Башня Серого Круга', 'Tower of the Grey Circle'), x: 56, y: 18, w: 5, h: 5, style: 'tower', wall: '#6a6a80', roof: '#3a2a5a', door: 2, interior: 'tower', roofH: 5 },
+  { id: 'fence', name: L('Лавка Лис', "Lis's Den"), x: 3, y: 29, w: 6, h: 5, style: 'timber', wall: '#a89878', roof: '#4a3a3a', door: 2, interior: 'fence', roofH: 3, sign: 'coin' },
+  { id: 'house1', name: L('Дом Холтов', 'The Holt House'), x: 38, y: 6, w: 7, h: 5, style: 'timber', wall: '#e0d0b8', roof: '#5a4a6a', door: 3, roofH: 3 },
+  { id: 'cottage', name: L('Домик вдовы Ханны', "Widow Hanna's Cottage"), x: 58, y: 29, w: 4, h: 5, style: 'timber', wall: '#d8c8a8', roof: '#6a5a2a', door: 1, roofH: 3 },
+  { id: 'hut', name: L('Сторожка Йорна', "Yorn's Lodge"), x: 15, y: 5, w: 4, h: 4, style: 'timber', wall: '#9a8a70', roof: '#4a4038', door: 1, roofH: 2 },
   { id: 'grocer', name: L('Лавка Марты', "Marta's Provisions"), x: 22, y: 29, w: 7, h: 5, style: 'shop', wall: '#e0c8a0', roof: '#8a6a3a', door: 3, interior: 'grocer', roofH: 3, sign: 'bread' },
 ];
 
@@ -93,6 +97,8 @@ export function buildTownMap(): TileMap {
   m.fillRect(46, 11, 13, 2, Tile.DIRT);
   lane(52, 13, 25); // усадьба → дорога
   m.fillRect(33, 12, 19, 2, Tile.PATH); // храм ↔ усадьба
+  lane(41, 11, 12, 1); // дом Холтов
+  lane(16, 9, 10, 1); // сторожка Йорна
   // заросший двор усадьбы
   for (let i = 0; i < 18; i++) m.set(rng.int(45, 59), rng.int(3, 12), Tile.DIRT);
   return m;
@@ -129,6 +135,14 @@ export function buildTown(game: GameApi): World {
     }
   }
 
+  // сад усадьбы
+  if (game.state.manor.upgrades.includes('garden')) {
+    GARDEN_PLOTS.forEach(([gx, gy], i) => {
+      map.set(gx, gy, Tile.FARMLAND);
+      w.addNow(new GardenPlot(gx * TILE + 8, gy * TILE + 8, i));
+    });
+  }
+
   // колодец на площади
   const well = new Prop(31 * TILE + 8, 20 * TILE + 12, 'well', { block: true, hw: 10, hh: 6 });
   well.blockRect(30, 19, 3, 2);
@@ -153,7 +167,7 @@ export function buildTown(game: GameApi): World {
       if (rng.chance(0.2)) continue;
       w.addNow(new Prop(gx * TILE + 8, gy * TILE + 14, `grave${rng.int(0, 2)}`, { block: true, hw: 5, hh: 3 }));
     }
-  for (const [gx, gy] of [[5, 5], [7, 5], [17, 5], [18, 7], [5, 8], [17, 9]] as const)
+  for (const [gx, gy] of [[5, 5], [7, 5], [5, 8], [17, 10]] as const)
     w.addNow(new Prop(gx * TILE + 8, gy * TILE + 14, `grave${rng.int(0, 2)}`, { block: true, hw: 5, hh: 3 }));
 
   // деревья по краям и в сквере
@@ -184,7 +198,5 @@ export function buildTown(game: GameApi): World {
   for (const [bx, by] of [[13, 24], [4, 24], [21, 34], [44, 34], [59, 34]] as const)
     w.addNow(new Prop(bx * TILE + 8, by * TILE + 13, 'barrel', { block: true, hw: 5, hh: 3 }));
 
-  // жители на улице
-  w.addNow(new Npc('yorn', 12 * TILE + 8, 13 * TILE + 8, 20));
   return w;
 }

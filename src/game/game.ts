@@ -6,6 +6,7 @@ import { SHOPS } from '../data/shops';
 import { tr } from '../data/strings';
 import { isElevatorFloor, MAX_STORY_FLOOR } from '../data/tiers';
 import '../data/dialogue';
+import '../data/dialogue2';
 import { buildDungeon } from './dungeon/dungeonWorld';
 import type { Actor } from './entities/entity';
 import { Npc } from './entities/npc';
@@ -24,8 +25,23 @@ import { bedSpawn, buildInterior, infirmarySpawn, interiorEntry } from './town/i
 import { buildTown, doorSpawn } from './town/town';
 import type { EquipSlot, ItemStack, Stats, WeaponClass } from './types';
 import type { GameApi, SpawnSpec, World } from './world';
+import { CROPS, ITEMS } from '../data/items';
+import { UPGRADE_BY_ID } from '../data/manor';
+import { npcDef, type FactionId } from '../data/npcs';
+import { QUEST_BY_ID, type QuestDef } from '../data/quests';
+import { RECIPE_BY_ID, type Station } from '../data/recipes';
+import { L } from '../data/loc';
+import { NpcDirector } from './systems/npcs';
+import { addAffix, enchantCost, forgeRarity, knownRecipes, missingFor, rerollAffixes, rerollCost, SHARPEN_CHANCE, sharpenCost } from './systems/crafting';
+import { GIFT_POINTS, giftReaction, isBirthday, reactionLine } from './systems/relations';
+import { growNight, initGarden, isRainy } from './systems/garden';
+import { countItem, removeItem } from './systems/inventory';
+import { rotatingPrice } from './systems/economy';
+import { weekday } from './systems/calendar';
 
-export type Mode = 'play' | 'dialogue' | 'shop' | 'elevator' | 'lore' | 'dead';
+export type Mode = 'play' | 'dialogue' | 'shop' | 'elevator' | 'lore' | 'dead' | 'craft' | 'storage' | 'build' | 'service';
+export type Service = 'sharpen' | 'enchant' | 'reroll';
+export type ItemRef = { inv: number } | { equip: EquipSlot };
 
 interface Transition {
   t: number;
@@ -59,9 +75,15 @@ export class Game implements GameApi, DialogueHost {
   private deathTimer = -1;
   private talkingNpc: Npc | null = null;
   readonly rng = new Rng((Date.now() ^ 0x2545f491) >>> 0);
+  readonly npcs: NpcDirector;
+  craftStation: Station | null = null;
+  service: Service | null = null;
+  private questT = 0;
 
   constructor(state: GameState) {
     this.state = state;
+    this.npcs = new NpcDirector(state);
+    if (!state.economy.rotating.length) dailyEconomy(state);
     setLang(state.settings.lang);
     const loc = state.location;
     const ref: SceneRef = loc.scene.kind === 'dungeon' ? { kind: 'town' } : loc.scene;
@@ -111,9 +133,15 @@ export class Game implements GameApi, DialogueHost {
     if (input.pressed.has('swap')) this.swapWeapons();
 
     this.world.step(dt);
+    this.npcs.update(this.world, dt);
     this.tickTime(dt);
     this.tickBuffs(dt);
     this.syncHero();
+    this.questT -= dt;
+    if (this.questT <= 0) {
+      this.questT = 1;
+      this.checkQuests();
+    }
   }
 
   private tickTime(dt: number): void {
@@ -192,9 +220,11 @@ export class Game implements GameApi, DialogueHost {
     if (ref.kind === 'town') {
       world = buildTown(this);
       sp ??= doorSpawn('manor');
+      this.npcs.populate(world);
     } else if (ref.kind === 'interior') {
       world = buildInterior(this, ref.id);
       sp ??= interiorEntry(ref.id);
+      this.npcs.populate(world);
     } else {
       const d = buildDungeon(this, ref.floor);
       world = d.world;
@@ -222,6 +252,11 @@ export class Game implements GameApi, DialogueHost {
   private onEnterFloor(floor: number): void {
     const d = this.state.dungeon;
     if (floor > d.deepest) d.deepest = floor;
+    const tier = Math.ceil(floor / 10);
+    if (floor % 10 === 1 && !this.state.flags[`tier_seen_${tier}`]) {
+      this.state.flags[`tier_seen_${tier}`] = true;
+      setTimeout(() => this.events.emit('tierEnter', { tier }), 700);
+    }
     if (isElevatorFloor(floor) && !d.elevator.includes(floor)) {
       d.elevator.push(floor);
       d.elevator.sort((a, b) => a - b);
@@ -419,8 +454,21 @@ export class Game implements GameApi, DialogueHost {
 
   /** Начать новый день: календарь, восстановление, автосохранение. */
   private newDay(tired: boolean): void {
+    const rained = isRainy(this.state.time.weather);
     advanceDay(this.state);
     dailyEconomy(this.state);
+    const withered = growNight(this.state, rained, this.state.time.season);
+    if (withered) this.toast(tr('withered', { n: withered }), '#c0a080');
+    const b = this.state.manor.building;
+    if (b) {
+      b.daysLeft--;
+      if (b.daysLeft <= 0) {
+        this.state.manor.upgrades.push(b.id);
+        this.state.manor.building = null;
+        if (b.id === 'garden') initGarden(this.state);
+        setTimeout(() => this.toast(tr('buildDone', { name: t(UPGRADE_BY_ID[b.id]!.name) }), '#ffd040'), 1500);
+      }
+    }
     const h = this.state.hero;
     h.energy = Math.round(h.maxEnergy * (tired ? 0.75 : 1));
     h.hp = this.stats().maxHp;
@@ -436,8 +484,16 @@ export class Game implements GameApi, DialogueHost {
 
   // ───────────────────────── Диалоги ─────────────────────────
 
+  /** Прилавок: торговать можно, только если хозяин на месте. */
+  counter(npcId: string): void {
+    if (this.npcs.isPresent(this.world, npcId)) this.talk(npcId);
+    else this.toast(tr('nobodyHere'), '#c0a080');
+  }
+
   talk(npcId: string): void {
+    if (this.turnInItems(npcId)) return; // сдача задания открыла свой диалог
     const line = pickLine(this, npcId);
+    this.completeTalkQuests(npcId);
     this.dialogue = new DialogueRunner(this, npcId, line);
     this.mode = 'dialogue';
     const ns = npcState(this.state, npcId);
@@ -693,6 +749,386 @@ export class Game implements GameApi, DialogueHost {
   setQuick(slot: number, def: string | null): void {
     this.state.quick[slot] = def;
     this.events.emit('inventory', undefined);
+  }
+
+  // ───────────────────────── Задания ─────────────────────────
+
+  startQuest(id: string): void {
+    const q = QUEST_BY_ID[id];
+    if (!q || this.state.quests[id]) return;
+    const base = q.goal.kind === 'kill' ? (this.state.stats[`kill_${q.goal.monster}`] ?? 0) : 0;
+    this.state.quests[id] = { status: 'active', progress: 0, base };
+    this.toast(tr('questNew', { name: t(q.title) }), '#a0d0ff');
+    this.world?.fx({ t: 'sfx', id: 'lore' });
+    this.checkQuests();
+  }
+
+  questActive(id: string): boolean {
+    return this.state.quests[id]?.status === 'active';
+  }
+
+  questDone(id: string): boolean {
+    return this.state.quests[id]?.status === 'done';
+  }
+
+  /** Прогресс задания: [сколько, из скольких]. */
+  questProgress(id: string): [number, number] {
+    const q = QUEST_BY_ID[id]!;
+    const st = this.state.quests[id];
+    const s = this.state;
+    const g = q.goal;
+    switch (g.kind) {
+      case 'floor':
+        return [Math.min(g.n, s.dungeon.deepest), g.n];
+      case 'boss':
+        return [s.dungeon.bosses.includes(g.floor) ? 1 : 0, 1];
+      case 'lore':
+        return [Math.min(g.count, g.ids ? g.ids.filter((x) => s.lore.includes(x)).length : s.lore.length), g.count];
+      case 'item':
+        return [Math.min(g.qty, countItem(s.inventory, g.item)), g.qty];
+      case 'kill':
+        return [Math.min(g.n, (s.stats[`kill_${g.monster}`] ?? 0) - (st?.base ?? 0)), g.n];
+      case 'upgrade':
+        return [s.manor.upgrades.includes(g.id) || s.manor.building?.id === g.id ? 1 : 0, 1];
+      case 'talk':
+        return [0, 1];
+    }
+  }
+
+  /** Автоматически завершить задания, чьи условия выполнены (кроме сдачи предметов и разговоров). */
+  checkQuests(): void {
+    for (const [id, st] of Object.entries(this.state.quests)) {
+      if (st.status !== 'active') continue;
+      const q = QUEST_BY_ID[id];
+      if (!q || q.goal.kind === 'item' || q.goal.kind === 'talk') continue;
+      const [a, b] = this.questProgress(id);
+      st.progress = a;
+      if (a >= b) this.completeQuest(q);
+    }
+  }
+
+  private completeQuest(q: QuestDef): void {
+    const st = this.state.quests[q.id];
+    if (!st || st.status === 'done') return;
+    st.status = 'done';
+    const r = q.reward;
+    if (r.gold) this.giveGold(r.gold);
+    for (const [id, n] of r.items ?? []) this.give(id, n);
+    for (const [npc, pts] of r.friendship ?? []) this.friendship(npc, pts);
+    for (const rid of r.recipes ?? []) this.learnRecipe(rid);
+    for (const [f, d] of r.rep ?? []) this.rep(f, d);
+    for (const f of r.flags ?? []) this.setFlag(f);
+    this.toast(tr('questDone', { name: t(q.title) }), '#ffd040');
+    this.world?.fx({ t: 'sfx', id: 'levelup' });
+    if (q.next) this.startQuest(q.next);
+  }
+
+  /** Сдача заданий «принеси предмет». true — открылся диалог благодарности. */
+  private turnInItems(npc: string): boolean {
+    for (const [id, st] of Object.entries(this.state.quests)) {
+      const q = QUEST_BY_ID[id];
+      if (st.status !== 'active' || !q || q.giver !== npc || q.goal.kind !== 'item') continue;
+      const g = q.goal;
+      if (countItem(this.state.inventory, g.item) < g.qty) continue;
+      removeItem(this.state.inventory, g.item, g.qty);
+      this.events.emit('inventory', undefined);
+      const line = { id: `thanks:${id}`, npc, priority: 0, pages: [q.thanks ?? L('Спасибо! Ты очень выручил(а).', 'Thank you! You really helped.')] };
+      this.dialogue = new DialogueRunner(this, npc, line);
+      this.mode = 'dialogue';
+      this.events.emit('dialogue', undefined);
+      this.completeQuest(q);
+      return true;
+    }
+    return false;
+  }
+
+  private completeTalkQuests(npc: string): void {
+    for (const [id, st] of Object.entries(this.state.quests)) {
+      const q = QUEST_BY_ID[id];
+      if (st.status === 'active' && q?.goal.kind === 'talk' && q.goal.npc === npc) this.completeQuest(q);
+    }
+  }
+
+  learnRecipe(id: string): void {
+    const r = RECIPE_BY_ID[id];
+    if (!r || r.known || this.state.recipes.includes(id)) return;
+    this.state.recipes.push(id);
+    this.toast(tr('recipeLearned', { name: t(itemDef(r.output[0]).name) }), '#a0ffa0');
+  }
+
+  rep(f: FactionId, delta: number): void {
+    const v = this.state.factions[f] + delta;
+    this.state.factions[f] = Math.max(-100, Math.min(100, v));
+  }
+
+  // ───────────────────────── Крафт, склад, стройка, услуги ─────────────────────────
+
+  openCrafting(station: Station): void {
+    this.craftStation = station;
+    this.mode = 'craft';
+    this.events.emit('panel', { kind: 'craft' });
+  }
+
+  craftList() {
+    if (!this.craftStation) return [];
+    return knownRecipes(this.state, this.craftStation).map((r) => ({ r, missing: missingFor(this.state, r) }));
+  }
+
+  craft(recipeId: string): boolean {
+    const r = RECIPE_BY_ID[recipeId];
+    if (!r || (!r.known && !this.state.recipes.includes(recipeId))) return false;
+    if (missingFor(this.state, r).length) return false;
+    const h = this.state.hero;
+    if (h.energy < r.energy) {
+      this.toast(tr('tooTired'), '#ffb060');
+      return false;
+    }
+    const [out, n] = r.output;
+    if (capacityFor(this.state.inventory, out) < n) {
+      this.toast(tr('inventoryFull'), '#ff8080');
+      return false;
+    }
+    for (const [id, q] of r.inputs) removeItem(this.state.inventory, id, q);
+    h.energy -= r.energy;
+    this.state.time.minutes += r.minutes;
+    const stack = r.station === 'anvil' ? makeItem(this.rng, out, forgeRarity(this.rng, h.level), n) : makeItem(this.rng, out, 0, n);
+    this.giveItem(stack);
+    this.state.stats.crafted = (this.state.stats.crafted ?? 0) + 1;
+    this.world.fx({ t: 'sfx', id: r.station === 'anvil' || r.station === 'furnace' ? 'pick' : r.station === 'alchemy' ? 'drink' : 'eat' });
+    this.events.emit('panel', { kind: 'craft' });
+    return true;
+  }
+
+  closePanel(): void {
+    this.craftStation = null;
+    this.service = null;
+    this.mode = 'play';
+    this.events.emit('panel', null);
+  }
+
+  openStorage(): void {
+    this.mode = 'storage';
+    this.events.emit('panel', { kind: 'storage' });
+  }
+
+  /** Переложить стопку между инвентарём и сундуком. */
+  moveStorage(from: 'inv' | 'store', index: number): void {
+    const src = from === 'inv' ? this.state.inventory : this.state.storage;
+    const dst = from === 'inv' ? this.state.storage : this.state.inventory;
+    const s = src[index];
+    if (!s) return;
+    addToContainer(dst, s);
+    if (s.qty <= 0) src[index] = null;
+    this.events.emit('inventory', undefined);
+    this.events.emit('panel', { kind: 'storage' });
+  }
+
+  openBuild(): void {
+    this.mode = 'build';
+    this.events.emit('panel', { kind: 'build' });
+  }
+
+  /** Заказать улучшение усадьбы у Борина. Возвращает причину отказа или null. */
+  orderUpgrade(id: string): string | null {
+    const u = UPGRADE_BY_ID[id];
+    const m = this.state.manor;
+    if (!u) return 'unknown';
+    if (m.upgrades.includes(id)) return tr('alreadyBuilt');
+    if (m.building) return tr('busyBuilding');
+    if (u.requires?.some((r) => !m.upgrades.includes(r))) return tr('needsFirst');
+    if (this.state.hero.gold < u.cost) return tr('notEnoughGold');
+    for (const [it, q] of u.items) if (countItem(this.state.inventory, it) < q) return tr('notEnoughMaterials');
+    this.state.hero.gold -= u.cost;
+    for (const [it, q] of u.items) removeItem(this.state.inventory, it, q);
+    m.building = { id, daysLeft: u.days };
+    this.toast(tr('buildStarted', { name: t(u.name), n: u.days }), '#ffd040');
+    this.world.fx({ t: 'sfx', id: 'coin' });
+    this.events.emit('inventory', undefined);
+    this.events.emit('panel', { kind: 'build' });
+    this.checkQuests();
+    return null;
+  }
+
+  openService(kind: Service): void {
+    this.service = kind;
+    this.mode = 'service';
+    this.events.emit('panel', { kind: 'service' });
+  }
+
+  refStack(ref: ItemRef): ItemStack | null {
+    return 'inv' in ref ? this.state.inventory[ref.inv] ?? null : this.state.equipment[ref.equip];
+  }
+
+  serviceCost(ref: ItemRef): { gold: number; bar?: string; bars?: number; chance?: number } | null {
+    const s = this.refStack(ref);
+    if (!s || !this.service) return null;
+    if (this.service === 'sharpen') {
+      const c = sharpenCost(s);
+      return c ? { gold: c.gold, bar: c.bar, bars: c.bars, chance: SHARPEN_CHANCE[s.upgrade] } : null;
+    }
+    const g = this.service === 'enchant' ? enchantCost(s) : rerollCost(s);
+    return g === null ? null : { gold: g };
+  }
+
+  applyService(ref: ItemRef): boolean {
+    const s = this.refStack(ref);
+    const cost = this.serviceCost(ref);
+    if (!s || !cost) return false;
+    const h = this.state.hero;
+    if (h.gold < cost.gold) {
+      this.toast(tr('notEnoughGold'), '#ff8080');
+      return false;
+    }
+    if (cost.bar && countItem(this.state.inventory, cost.bar) < (cost.bars ?? 0)) {
+      this.toast(tr('notEnoughMaterials'), '#ff8080');
+      return false;
+    }
+    h.gold -= cost.gold;
+    if (cost.bar) removeItem(this.state.inventory, cost.bar, cost.bars ?? 0);
+    if (this.service === 'sharpen') {
+      if (this.rng.chance(cost.chance ?? 1)) {
+        s.upgrade++;
+        this.toast(tr('sharpenOk', { n: s.upgrade }), '#a0ffa0');
+        this.world.fx({ t: 'sfx', id: 'rare' });
+      } else {
+        this.toast(tr('sharpenFail'), '#ff8080');
+        this.world.fx({ t: 'sfx', id: 'block' });
+      }
+    } else if (this.service === 'enchant') {
+      addAffix(this.rng, s);
+      this.world.fx({ t: 'sfx', id: 'rare' });
+    } else {
+      rerollAffixes(this.rng, s);
+      this.world.fx({ t: 'sfx', id: 'cast' });
+    }
+    this.refreshStats();
+    this.events.emit('panel', { kind: 'service' });
+    return true;
+  }
+
+  // ───────────────────────── Подарки ─────────────────────────
+
+  canGift(npc: string): boolean {
+    const ns = npcState(this.state, npc);
+    const bday = isBirthday(this.state, npcDef(npc));
+    return !ns.giftedToday && (ns.giftsWeek < 2 || bday);
+  }
+
+  giveGift(npc: string, index: number): void {
+    const s = this.state.inventory[index];
+    if (!s || !this.canGift(npc)) return;
+    const d = itemDef(s.def);
+    if (d.kind === 'quest') return;
+    const def = npcDef(npc);
+    const reaction = giftReaction(def, s.def);
+    const bday = isBirthday(this.state, def);
+    const ns = npcState(this.state, npc);
+    const before = hearts(this.state, npc);
+    ns.points = Math.max(0, Math.min(10 * 250 + 249, ns.points + GIFT_POINTS[reaction] * (bday ? 8 : 1)));
+    ns.giftedToday = true;
+    ns.giftsWeek++;
+    (this.state.giftLog[npc] ??= {})[s.def] = reaction;
+    s.qty--;
+    if (s.qty <= 0) this.state.inventory[index] = null;
+    const after = hearts(this.state, npc);
+    const text = reactionLine(reaction, this.state.time.totalDays + index);
+    const pages = bday ? [L('Ты вспомнил(а) про мой день рождения!', 'You remembered my birthday!'), text] : [text];
+    this.dialogue = new DialogueRunner(this, npc, { id: 'gift', npc, priority: 0, pages });
+    this.mode = 'dialogue';
+    this.events.emit('dialogue', undefined);
+    this.events.emit('inventory', undefined);
+    this.world.fx({ t: 'sfx', id: reaction === 'love' || reaction === 'like' ? 'heal' : 'block' });
+    if (after > before) this.toast(`${t(def.name)}: ${'♥'.repeat(after)}`, '#ff8aa0');
+  }
+
+  // ───────────────────────── Сад ─────────────────────────
+
+  plotLabel(i: number): string {
+    const p = this.state.manor.garden[i];
+    if (!p) return '';
+    if (p.ready) return tr('harvest');
+    if (!p.seed) return tr('plant');
+    if (!p.watered && !isRainy(this.state.time.weather)) return tr('water');
+    return '';
+  }
+
+  plotAction(i: number): void {
+    const p = this.state.manor.garden[i];
+    if (!p) return;
+    const w = this.world;
+    const [px, py] = [(w.entities.find((e) => (e as { index?: number }).index === i && e.sprite === 'plot')?.x ?? 0), 0];
+    void py;
+    if (p.ready && p.seed) {
+      const c = CROPS[p.seed]!;
+      const n = 1 + (this.rng.chance(0.2 + this.stats().luck * 0.02) ? 1 : 0);
+      this.give(c.crop, n);
+      if (c.regrow) {
+        p.ready = false;
+        p.days = c.days - c.regrow;
+      } else Object.assign(p, { seed: null, days: 0, ready: false });
+      w.fx({ t: 'sfx', id: 'pickup' });
+      this.state.stats.harvested = (this.state.stats.harvested ?? 0) + n;
+      return;
+    }
+    if (!p.seed) {
+      const season = this.state.time.season;
+      const idx = this.state.inventory.findIndex((s) => s && CROPS[s.def]?.seasons.includes(season));
+      if (idx < 0) {
+        this.toast(tr('needSeeds'), '#c0a080');
+        return;
+      }
+      if (!this.useEnergy(2)) return this.toast(tr('tooTired'), '#ffb060');
+      const s = this.state.inventory[idx]!;
+      p.seed = s.def;
+      p.days = 0;
+      p.watered = false;
+      s.qty--;
+      if (s.qty <= 0) this.state.inventory[idx] = null;
+      w.fx({ t: 'dust', x: px, y: this.player.y, n: 3 });
+      this.events.emit('inventory', undefined);
+      return;
+    }
+    if (!p.watered) {
+      if (!this.useEnergy(1)) return this.toast(tr('tooTired'), '#ffb060');
+      p.watered = true;
+      w.fx({ t: 'sparkle', x: this.player.x, y: this.player.y - 4, color: '#6ab0ff', n: 6 });
+      w.fx({ t: 'sfx', id: 'drink' });
+    }
+  }
+
+  // ───────────────────────── Ротация у Лис ─────────────────────────
+
+  buyRotating(index: number): boolean {
+    const shop = this.shopId ? SHOPS[this.shopId] : null;
+    const st = this.state.economy.rotating[index];
+    if (!shop?.rotating || !st) return false;
+    const price = rotatingPrice(this.state, st, shop);
+    if (this.state.hero.gold < price) {
+      this.toast(tr('notEnoughGold'), '#ff8080');
+      return false;
+    }
+    if (this.state.inventory.indexOf(null) < 0) {
+      this.toast(tr('inventoryFull'), '#ff8080');
+      return false;
+    }
+    this.state.hero.gold -= price;
+    this.state.economy.rotating.splice(index, 1);
+    this.giveItem(st);
+    this.world.fx({ t: 'sfx', id: 'coin' });
+    this.events.emit('shop', { id: shop.id });
+    return true;
+  }
+
+  weekdayName(): string {
+    return weekday(this.state.time.day);
+  }
+
+  hasItem(def: string, n = 1): boolean {
+    return countItem(this.state.inventory, def) >= n;
+  }
+
+  itemExists(def: string): boolean {
+    return !!ITEMS[def];
   }
 
   // ───────────────────────── Сохранение ─────────────────────────
