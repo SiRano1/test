@@ -177,7 +177,7 @@ const ROUTES: Record<string, Route> = {
     fn: (ctx, r) => {
       if (!ctx.arena) throw new ApiError(503, 'arena_offline');
       const mode = r.body.mode as ArenaMode;
-      if (!['duel', 'team', 'waves'].includes(mode)) throw new ApiError(400, 'bad_mode');
+      if (!['duel', 'team', 'waves', 'raid'].includes(mode)) throw new ApiError(400, 'bad_mode');
       return ctx.arena.enqueue(hero(ctx, r).id, mode, !!r.body.ranked);
     },
   },

@@ -8,6 +8,7 @@ import { Db } from './db';
 import { httpHandler } from './http';
 import { ArenaRoom, arenaQueue, env, GuildChatRoom, WastesRoom } from './rooms';
 import { settleAuctions } from './services/auction';
+import { seasonTick } from './services/arena';
 import { ensureTerritories, settleTerritories, territoryIncome, weekOf } from './services/guild';
 
 export interface RunningServer {
@@ -27,6 +28,7 @@ export async function startServer(opts: { port?: number; dbPath?: string; now?: 
   env.secret = jwtSecret(db);
   env.now = opts.now ?? (() => Date.now());
   ensureTerritories(db);
+  seasonTick(db, env.now());
 
   const http = createServer(httpHandler({ db, secret: env.secret, now: env.now, arena: arenaQueue }));
   const game = new Server({ transport: new WebSocketTransport({ server: http }), greet: false });
@@ -45,6 +47,7 @@ export async function startServer(opts: { port?: number; dbPath?: string; now?: 
       if (weekOf(now) !== lastWeek) {
         lastWeek = weekOf(now);
         settleTerritories(db, now);
+        seasonTick(db, now);
       }
       const day = Math.floor(now / 86_400_000);
       if (day !== lastDay) {

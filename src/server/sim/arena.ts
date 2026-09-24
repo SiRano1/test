@@ -1,6 +1,6 @@
 import { TILE } from '../../core/math';
 import { Tile } from '../../core/tilemap';
-import { bossForFloor, TIERS } from '../../data/tiers';
+import { ABYSS_BOSSES, bossForFloor, TIERS } from '../../data/tiers';
 import { Boss } from '../../game/entities/boss';
 import { Enemy } from '../../game/entities/enemy';
 import type { ArenaMode } from '../../online/protocol';
@@ -32,15 +32,21 @@ export class ArenaSim extends SimCore {
   result: ArenaResult | null = null;
   readonly side = new Map<string, 'A' | 'B'>();
 
-  constructor(readonly mode: ArenaMode, readonly ranked: boolean, entrants: { hero: SimHero; team: 'A' | 'B' }[], seed: number) {
-    super(mode === 'waves' ? arenaMap(30, 20) : arenaMap(), mode === 'waves' ? 'tier6' : 'tier7', seed, mode === 'waves' ? 1 : 7);
+  /** Кооперативные режимы: все герои в одной команде против чудовищ. */
+  readonly coop: boolean;
+  boss: Boss | null = null;
+
+  constructor(readonly mode: ArenaMode, readonly ranked: boolean, entrants: { hero: SimHero; team: 'A' | 'B' }[], seed: number, readonly week = 0) {
+    const coop = mode === 'waves' || mode === 'raid';
+    super(coop ? arenaMap(30, 20) : arenaMap(), mode === 'waves' ? 'tier6' : mode === 'raid' ? 'tier8' : 'tier7', seed, mode === 'waves' ? 1 : 7);
+    this.coop = coop;
     const W = this.map.w * TILE, H = this.map.h * TILE;
     const idx = { A: 0, B: 0 };
     for (const { hero, team } of entrants) {
       const i = idx[team]++;
-      const x = mode === 'waves' ? W / 2 + (i - 1) * 24 : team === 'A' ? 4 * TILE : W - 4 * TILE;
-      const y = mode === 'waves' ? H / 2 : H / 2 + (i - 1) * 36;
-      const p = this.addHero(hero, x, y, mode === 'waves' || team === 'A' ? 'player' : 'enemy', ranked);
+      const x = coop ? W / 2 + (i - 2) * 24 : team === 'A' ? 4 * TILE : W - 4 * TILE;
+      const y = coop ? H - 5 * TILE : H / 2 + (i - 1) * 36;
+      const p = this.addHero(hero, x, y, coop || team === 'A' ? 'player' : 'enemy', ranked);
       p.aim = team === 'A' ? 0 : Math.PI;
       this.side.set(hero.id, team);
     }
@@ -60,12 +66,14 @@ export class ArenaSim extends SimCore {
       if (this.timer <= 0) {
         this.phase = this.mode === 'waves' ? 'between' : 'fight';
         this.timer = 0.5;
+        if (this.mode === 'raid') this.spawnRaidBoss();
       }
       return;
     }
     super.step(dt);
     const d = dt ?? 1 / 30;
     if (this.mode === 'waves') return this.stepWaves(d);
+    if (this.mode === 'raid') return this.stepRaid(d);
     this.fightTime += d;
     const a = this.alive('A').length, b = this.alive('B').length;
     if (!a || !b) return this.finish(a ? 'A' : b ? 'B' : null);
@@ -103,6 +111,33 @@ export class ArenaSim extends SimCore {
           p.hp = Math.round(p.maxHp * 0.3);
         } else p.hp = Math.min(p.maxHp, p.hp + p.maxHp * 0.25);
       }
+    }
+  }
+
+  /**
+   * Рейд «Разлом»: босс недели (эхо прежних стражей по кругу) с силой Бездны,
+   * здоровье растёт с числом участников.
+   */
+  spawnRaidBoss(): void {
+    const id = ABYSS_BOSSES[this.week % ABYSS_BOSSES.length]!;
+    const b = new Boss(id, (this.map.w / 2) * TILE, 5 * TILE, 90);
+    const party = this.heroes.size;
+    b.hp = b.maxHp = Math.round(b.maxHp * (0.6 + 0.35 * party));
+    b.arena = { x: 0, y: 0, w: this.map.w * TILE, h: this.map.h * TILE };
+    this.world.add(b);
+    b.wake(this.world);
+    this.boss = b;
+  }
+
+  private stepRaid(dt: number): void {
+    this.fightTime += dt;
+    const ids = [...this.heroes.keys()];
+    if (this.boss?.dead) {
+      this.phase = 'over';
+      this.result = { mode: 'raid', ranked: false, winners: ids, losers: [], draw: false, waves: 0, duration: this.fightTime };
+    } else if (![...this.heroes.values()].some((p) => !p.dead) || this.fightTime > 600) {
+      this.phase = 'over';
+      this.result = { mode: 'raid', ranked: false, winners: [], losers: ids, draw: false, waves: 0, duration: this.fightTime };
     }
   }
 
@@ -162,14 +197,15 @@ export class ArenaSim extends SimCore {
   protected onHeroDeath(_p: NetHero): void {}
 
   protected override heroTag(p: NetHero) {
-    return { n: p.hero.name, c: this.mode === 'waves' ? 'blue' : this.side.get(p.hero.id) === 'A' ? 'blue' : 'red' };
+    return { n: p.hero.name, c: this.coop ? 'blue' : this.side.get(p.hero.id) === 'A' ? 'blue' : 'red' };
   }
 
   hud() {
     return {
       wave: this.mode === 'waves' ? this.wave : undefined,
-      timer: this.phase === 'countdown' ? Math.ceil(this.timer) : this.mode === 'waves' ? undefined : Math.max(0, Math.ceil(FIGHT_LIMIT - this.fightTime)),
-      teams: this.mode === 'waves' ? undefined : ([this.alive('A').length, this.alive('B').length] as [number, number]),
+      timer: this.phase === 'countdown' ? Math.ceil(this.timer) : this.coop ? undefined : Math.max(0, Math.ceil(FIGHT_LIMIT - this.fightTime)),
+      teams: this.coop ? undefined : ([this.alive('A').length, this.alive('B').length] as [number, number]),
+      msg: this.mode === 'raid' && this.boss ? `boss:${Math.round((100 * Math.max(0, this.boss.hp)) / this.boss.maxHp)}` : undefined,
     };
   }
 }

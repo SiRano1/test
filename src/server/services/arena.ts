@@ -1,4 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { Rng } from '../../core/rng';
+import { rollEquipment } from '../../game/systems/loot';
+import { weekOf } from './guild';
+import { giveToHero } from './hero';
 import { glicko2, teamAverage, type Rating } from '../sim/glicko';
 import type { ArenaResult } from '../sim/arena';
 import type { SimHero } from '../sim/hero';
@@ -18,6 +22,7 @@ export function loadSimHero(db: Db, heroId: string): SimHero {
 
 export const rewardFor = (res: ArenaResult, won: boolean) => {
   if (res.mode === 'waves') return { gold: res.waves * 15, xp: res.waves * 20, tokens: Math.floor(res.waves / 3) };
+  if (res.mode === 'raid') return won ? { gold: 400, xp: 600, tokens: 5 } : { gold: 30, xp: 60, tokens: 0 };
   if (res.draw) return { gold: 10, xp: 15, tokens: 0 };
   return won ? { gold: 20, xp: 30, tokens: res.ranked ? 2 : 1 } : { gold: 5, xp: 10, tokens: 0 };
 };
@@ -32,7 +37,19 @@ export function finishMatch(db: Db, res: ArenaResult, startedAt: number, now: nu
       return { rating: h.rating, rd: h.rd, vol: h.vol };
     };
     const before = new Map(ids.map((id) => [id, rating(id)]));
-    if (res.mode !== 'waves') {
+    if (res.mode === 'raid') {
+      // личная добыча рейда — раз в неделю на героя
+      const week = weekOf(now);
+      const rng = new Rng((now ^ 0x9e3779b9) >>> 0);
+      for (const id of res.winners) {
+        const key = `raid:${id}:${week}`;
+        if (db.meta(key)) continue;
+        db.setMeta(key, '1');
+        const it = rollEquipment(rng, { floor: 90, tier: 7, luck: 20 }, 4, 2);
+        giveToHero(db, id, { def: it.def, qty: 1, rarity: it.rarity, affixes: it.affixes }, 'raid_loot', now);
+        giveToHero(db, id, { def: 'abyss_shard', qty: 3 }, 'raid_loot', now);
+      }
+    } else if (res.mode !== 'waves') {
       const A = res.winners.length ? res.winners : res.losers.slice(0, Math.ceil(res.losers.length / 2));
       const B = res.winners.length ? res.losers : res.losers.slice(Math.ceil(res.losers.length / 2));
       for (const id of ids) {
@@ -60,4 +77,23 @@ export function finishMatch(db: Db, res: ArenaResult, startedAt: number, now: nu
       randomUUID(), res.mode, res.ranked ? 1 : 0, startedAt, now, JSON.stringify({ ...res, ratings: out }));
   });
   return out;
+}
+
+/** Сезоны по 8 недель: в начале нового — мягкий сброс рейтинга всем героям. */
+export const SEASON_WEEKS = 8;
+export const seasonOf = (now: number) => Math.floor(weekOf(now) / SEASON_WEEKS);
+
+export function seasonTick(db: Db, now: number): boolean {
+  const season = seasonOf(now);
+  const cur = Number(db.meta('season') ?? season);
+  if (db.meta('season') === undefined) {
+    db.setMeta('season', String(season));
+    return false;
+  }
+  if (season === cur) return false;
+  db.tx(() => {
+    db.run('UPDATE heroes SET rating = 0.7 * rating + 0.3 * 1500, rd = MAX(rd, 150)');
+    db.setMeta('season', String(season));
+  });
+  return true;
 }

@@ -234,3 +234,43 @@ describe('Пепельные Пустоши', () => {
     }
   });
 });
+
+import { seasonTick } from '../src/server/services/arena';
+
+describe('Рейды и сезоны', () => {
+  it('рейд: босс недели, здоровье по размеру отряда, победа и личная добыча раз в неделю', () => {
+    const ids = ['r1', 'r2', 'r3', 'r4'];
+    const sim = new ArenaSim('raid', false, ids.map((id) => ({ hero: hero(id, 'sword', 30), team: 'A' as const })), 9, 3);
+    for (let i = 0; i < 30 * 3 + 3; i++) sim.step();
+    expect(sim.boss).not.toBeNull();
+    expect(sim.boss!.def.id).toBe('brodrik');
+    const hp4 = sim.boss!.maxHp;
+    const solo = new ArenaSim('raid', false, [{ hero: hero('s1'), team: 'A' }], 9, 3);
+    for (let i = 0; i < 30 * 3 + 3; i++) solo.step();
+    expect(hp4).toBeGreaterThan(solo.boss!.maxHp * 1.8);
+    sim.boss!.die(sim.world);
+    sim.step();
+    expect(sim.result!.winners.sort()).toEqual(ids);
+
+    const db = new Db();
+    const hs = ids.map((id, i) => createHero(db, guestLogin(db, `dev-raid-00${i}`, 0).id, `Рейдер${i}`, 'sword', 0));
+    const res = { mode: 'raid' as const, ranked: false, winners: hs.map((h) => h.id), losers: [], draw: false, waves: 0, duration: 60 };
+    finishMatch(db, res, 0, 1_000_000);
+    const loot = (id: string) => db.all<{ def: string }>("SELECT def FROM items WHERE owner_id = ? AND owner_kind = 'hero'", id).length;
+    const after1 = loot(hs[0]!.id);
+    finishMatch(db, res, 0, 1_000_000 + 3_600_000);
+    expect(loot(hs[0]!.id)).toBe(after1); // та же неделя — без второй добычи
+    expect(heroById(db, hs[0]!.id).tokens).toBe(10);
+  });
+
+  it('сезон: мягкий сброс рейтинга раз в 8 недель', () => {
+    const db = new Db();
+    const h = createHero(db, guestLogin(db, 'dev-season-1', 0).id, 'Чемпион', 'sword', 0);
+    db.run('UPDATE heroes SET rating = 2000 WHERE id = ?', h.id);
+    const week = 7 * 86_400_000;
+    expect(seasonTick(db, 0)).toBe(false);
+    expect(seasonTick(db, 3 * week)).toBe(false);
+    expect(seasonTick(db, 8 * week + 1)).toBe(true);
+    expect(heroById(db, h.id).rating).toBe(1850);
+  });
+});

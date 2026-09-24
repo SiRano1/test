@@ -133,9 +133,11 @@ export interface NetSnapshot {
   hud?: { wave?: number; score?: number; timer?: number; teams?: [number, number]; msg?: string };
 }
 
-export type ArenaMode = 'duel' | 'team' | 'waves';
+export type ArenaMode = 'duel' | 'team' | 'waves' | 'raid';
 
-export const MODE_SIZE: Record<ArenaMode, number> = { duel: 2, team: 6, waves: 1 };
+/** Сколько игроков нужно для старта (рейд — от 4 до 6 членов одной гильдии). */
+export const MODE_SIZE: Record<ArenaMode, number> = { duel: 2, team: 6, waves: 1, raid: 4 };
+export const RAID_MAX = 6;
 
 export function leagueOf(rating: number): League {
   if (rating >= 2100) return 'legend';

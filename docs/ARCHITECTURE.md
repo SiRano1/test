@@ -9,7 +9,7 @@
 | Сборка | **Vite** | Быстрый dev-сервер, одна HTML-сборка для веба (`build:single`). |
 | Десктоп | **Electron или Tauri** (этап релиза) | Путь в Steam. Так же выпущены CrossCode и Vampire Survivors. |
 | Сервер | **Node.js + Colyseus** | Авторитарные комнаты (арена, PvP-зоны, чат гильдий) с синхронизацией состояния и HTTP-API для экономики. Общий TS-код с клиентом. |
-| БД | **PostgreSQL** (прод) / **SQLite** (разработка) | Транзакции для аукциона и казны, уникальные `item_uid`. |
+| БД | **SQLite** через встроенный `node:sqlite` (сейчас) / **PostgreSQL** (прод, позже) | Транзакции для аукциона и казны, уникальные `item_uid`, без нативных зависимостей. |
 | Тесты | **Vitest** (логика) + **Playwright** (дымовой e2e в Chromium) | Каждое изменение проверяется без ручного запуска. |
 
 Альтернативы: Godot 4 + Nakama — хороший выбор для нативного ПК. Но разделить код правил между клиентом и
@@ -38,8 +38,16 @@ src/
     gfx/              процедурный пиксель-арт: спрайты, тайлы, иконки, частицы, свет
     ui/               DOM-интерфейс: HUD, диалоги, инвентарь, магазины, меню
     main.ts           сборка всего вместе
-  online/             протокол клиент↔сервер (типы сообщений, валидация) — общий
-  server/             Colyseus-сервер, HTTP-API, репозитории БД
+  online/             протокол клиент↔сервер (DTO, снимки, ввод, лиги, права гильдий) — общий
+  server/             онлайн-сервер
+    db.ts             схема SQLite, транзакции (BEGIN IMMEDIATE), ключи уникальности имён
+    auth.ts           гостевой вход, e-mail + scrypt, JWT HS256, лимиты частоты
+    http.ts           маршруты /api/*, идемпотентность по requestId, CORS
+    services/         hero (предметы и золото с журналами), auction, guild, pvp (карма, награды), arena (итоги, Glicko, сезоны), wastes
+    sim/              серверные симуляции на общей боевой логике: core (ввод, снимки, карты), arena, wastes, glicko, hero (нормализация)
+    rooms.ts          комнаты Colyseus: arena, wastes, guild_chat; очередь подбора
+    main.ts           HTTP + WebSocket на одном порту, фоновые таймеры
+  client/net/         REST-клиент и сетевой сеанс (зеркальный мир из снимков)
 tests/                vitest
 e2e/                  дымовые Playwright-сценарии
 ```
@@ -124,6 +132,11 @@ SaveData {   // SAVE_VERSION = 3
 
 ### 4.3. Серверная БД (этап 4)
 
+Реализовано на SQLite (`src/server/db.ts`); таблицы ниже — исходный проект, фактическая схема близка к нему:
+`accounts, heroes, items (owner_kind: hero | equip | escrow | guild | mail), item_ledger, gold_ledger, requests,
+mail, auction_lots, auction_bids, sales, guilds, guild_members, guild_ranks, guild_invites, guild_withdrawals,
+guild_log, guild_chat, territories, territory_points, matches, bounties, meta`.
+
 ```sql
 accounts(id uuid pk, created_at, device_id unique, email unique null, banned bool)
 heroes(id uuid pk, account_id fk, name unique, level, xp, gold bigint check(gold>=0),
@@ -149,11 +162,13 @@ bounties(target_id pk, amount bigint, updated_at)
 * **HTTP** (`/api/*`, JSON, JWT): аккаунт, герой, аукцион, гильдии, таблицы лидеров.
   Каждый изменяющий запрос содержит `requestId` (идемпотентность).
 * **Colyseus rooms**:
-  * `arena_duel`, `arena_3v3`, `arena_waves` — авторитарная симуляция `game/combat`, 30 Гц;
-  * `wastes` — открытая PvP-зона с интерест-менеджментом по сетке;
-  * `guild_chat:{id}`.
-* Клиент шлёт `InputFrame` (seq, оси, действия, прицел). Сервер отвечает снапшотами состояния с `lastSeq`
-  для сверки. Клиентское предсказание — только для своего движения.
+  * `arena` (режимы duel, team, waves, raid) — авторитарная симуляция общей боевой логики, 30 Гц;
+  * `wastes` — открытая PvP-зона (одна на сервер, до 64 игроков);
+  * `guild_chat` (фильтр по `guildId`).
+* Клиент шлёт `NetInput` 30 раз в секунду (seq, оси, нажатые и удерживаемые действия, прицел). Сервер проверяет его
+  (нормализация вектора, белый список действий, монотонный seq), шагает мир 30 Гц и шлёт снимки 15 Гц с `ack`
+  и эффектами. Клиент строит «зеркальный» мир из настоящих сущностей игры и рисует его тем же рендером, сглаживая
+  позиции. Предсказание собственного движения — следующий шаг.
 
 ## 6. Тестирование и качество
 

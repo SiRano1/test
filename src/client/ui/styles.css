@@ -860,3 +860,50 @@ button.tal.sel {
   background: #140e14;
   border: 1px solid #3a2a34;
 }
+
+/* ── Онлайн ── */
+.online .tab-body {
+  font-size: 7px;
+}
+.online input {
+  font-size: 7px;
+}
+.net-msg {
+  color: #ff9090;
+  padding: 2px 4px;
+  font-size: 7px;
+}
+.chat {
+  min-height: 60px;
+  max-height: 90px;
+  overflow-y: auto;
+  background: #140e14;
+  border: 1px solid #3a2a34;
+  padding: 2px;
+  font-size: 6px;
+}
+.net-hud {
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.net-info {
+  color: var(--gold);
+  text-shadow: 1px 1px 0 #000;
+}
+.net-result {
+  position: fixed;
+  left: 50%;
+  top: 40%;
+  transform: translate(-50%, -50%);
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  padding: 8px 14px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

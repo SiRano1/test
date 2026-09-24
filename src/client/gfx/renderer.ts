@@ -34,6 +34,9 @@ interface LightSrc {
 
 const FACING_DIR: [Dir, boolean][] = [['down', false], ['side', true], ['side', false], ['up', false]];
 
+/** Что рендеру нужно от игры (одиночная Game или сетевой сеанс). */
+export type RenderSource = Pick<Game, 'world' | 'state' | 'busy' | 'mode' | 'fade' | 'events'>;
+
 export class Renderer {
   readonly cam = new Camera();
   readonly bank = new SpriteBank();
@@ -86,9 +89,9 @@ export class Renderer {
     }
   }
 
-  private game: Game | null = null;
+  private game: RenderSource | null = null;
 
-  render(game: Game, dt: number): void {
+  render(game: RenderSource, dt: number): void {
     this.game = game;
     this.contrast = game.state.settings.contrast;
     const ctx = this.ctx;
@@ -393,7 +396,7 @@ export class Renderer {
   private lightningT = 0;
 
   /** Дождь, гроза, снег, туман — только на улице. */
-  private drawWeather(game: Game, dt: number): void {
+  private drawWeather(game: RenderSource, dt: number): void {
     const w = game.world;
     const weather = game.state.time.weather;
     const ctx = this.ctx;
@@ -517,7 +520,9 @@ export class Renderer {
     ctx.restore();
   }
 
-  private weaponDef(_p: Player): string {
+  private weaponDef(p: Player): string {
+    const own = (p as Player & { netWeapon?: string }).netWeapon;
+    if (own) return own;
     const eq = this.game?.state.equipment.weapon;
     return eq ? eq.def : 'rusty_sword';
   }
@@ -664,7 +669,7 @@ export class Renderer {
 
   // ─────────────── Свет ───────────────
 
-  private drawLighting(game: Game, cx: number, cy: number): void {
+  private drawLighting(game: RenderSource, cx: number, cy: number): void {
     const w = game.world;
     const ctx = this.ctx;
     const mins = game.state.time.minutes;

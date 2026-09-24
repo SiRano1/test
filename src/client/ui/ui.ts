@@ -37,6 +37,7 @@ export interface UiCallbacks {
   continueGame(slot: number): void;
   saveAndQuit(): void;
   settingsChanged(): void;
+  openOnline(): void;
 }
 
 type MenuTab = 'inv' | 'skills' | 'quests' | 'relations' | 'chronicle' | 'settings';
@@ -1164,6 +1165,10 @@ export class Ui {
     show(this.titleEl, true);
   }
 
+  hideTitle(): void {
+    show(this.titleEl, false);
+  }
+
   private titleMode: 'main' | 'new' | 'load' | 'settings' = 'main';
 
   private renderTitle(): void {
@@ -1175,6 +1180,7 @@ export class Ui {
     if (this.titleMode === 'main') {
       if (hasSave) menu.append(h('button', { id: 'btn-continue', onclick: () => ((this.titleMode = 'load'), this.renderTitle()) }, tr('continue')));
       menu.append(h('button', { id: 'btn-new', onclick: () => ((this.titleMode = 'new'), this.renderTitle()) }, tr('newGame')));
+      menu.append(h('button', { id: 'btn-online', onclick: () => this.cb.openOnline() }, t(L('Онлайн', 'Online'))));
       menu.append(h('button', { onclick: () => ((this.titleMode = 'settings'), this.renderTitle()) }, tr('settings')));
       menu.append(h('div', { class: 'row' },
         h('button', { class: getLang() === 'ru' ? 'focus' : '', onclick: () => this.setLanguage('ru') }, 'RU'),

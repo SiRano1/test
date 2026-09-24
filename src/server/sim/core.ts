@@ -200,7 +200,7 @@ export abstract class SimCore {
       } else if (e instanceof Enemy) {
         const tg = e.telegraph();
         out.push({
-          id: e.id, k: 'mob', x: r(e.x), y: r(e.y), s: e.def.sprite, f: e.facing, hp: Math.round(e.hp), mhp: e.maxHp,
+          id: e.id, k: 'mob', x: r(e.x), y: r(e.y), s: e.def.id, f: e.facing, hp: Math.round(e.hp), mhp: e.maxHp,
           st: e.dead ? 'dead' : e.state, n: e.def.boss || e.def.elite ? e.def.id : undefined,
           tg: tg ? [tg.kind, r(tg.x), r(tg.y), Math.round(tg.angle * 100) / 100, Math.round(tg.p * 100) / 100] : undefined,
           a: tg ? Math.round((tg.r) * 10) / 10 : undefined, sp: tg ? Math.round(tg.half * 100) / 100 : undefined,

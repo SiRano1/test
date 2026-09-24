@@ -8,6 +8,8 @@ import { VIEW_H, VIEW_W } from './engine/camera';
 import { Input } from './engine/input';
 import { Renderer } from './gfx/renderer';
 import { Ui } from './ui/ui';
+import { OnlineUi } from './ui/online';
+import type { NetSession } from './net/session';
 
 const STEP = 1 / 60;
 
@@ -99,6 +101,21 @@ function boot(): void {
       ui.showTitle();
     },
     settingsChanged: persistSettings,
+    openOnline() {
+      audio.unlock();
+      ui.hideTitle();
+      online.open();
+    },
+  });
+
+  // онлайн-лобби и сетевой бой (этап 4)
+  let net: NetSession | null = null;
+  const online = new OnlineUi(document.getElementById('ui')!, renderer, audio, kv, () => ui.titleSettings, {
+    back: () => ui.showTitle(),
+    battle: (s) => {
+      net = s;
+      input.reset();
+    },
   });
 
   try {
@@ -142,6 +159,16 @@ function boot(): void {
         musicT = 1;
         const m = g.state.time.minutes;
         audio.startMusic(g.scene.kind === 'dungeon' ? 'dungeon' : m > 20 * 60 ? 'night' : 'town');
+      }
+    } else if (net) {
+      acc = 0;
+      if (input.takeUiKeys().includes('Escape')) online.endBattle();
+      else if (net.ready) {
+        net.update(dt, input.frame((sx, sy) => renderer.screenToWorld(sx, sy)));
+        renderer.render(net.view, dt);
+        net.drawOverlay(ctx);
+        online.updateHud(net);
+        if (net.ended && !net.result) online.endBattle();
       }
     } else {
       acc = 0;

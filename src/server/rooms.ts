@@ -1,6 +1,7 @@
 import { matchMaker, Room, type Client } from '@colyseus/core';
 import type { ArenaMode, NetSnapshot } from '../online/protocol';
-import { MODE_SIZE } from '../online/protocol';
+import { MODE_SIZE, RAID_MAX } from '../online/protocol';
+import { weekOf } from './services/guild';
 import { ApiError, RateLimiter, verifyJwt } from './auth';
 import type { Db } from './db';
 import type { ArenaQueueApi, QueueStatus } from './http';
@@ -75,7 +76,7 @@ export class ArenaRoom extends SimRoom<ArenaSim> {
     this.entrants = options.entrants;
     this.maxClients = options.entrants.length;
     this.autoDispose = true;
-    this.sim = new ArenaSim(options.mode, !!options.ranked, options.entrants.map((e) => ({ hero: loadSimHero(env.db, e.heroId), team: e.team })), Math.floor(Math.random() * 1e9));
+    this.sim = new ArenaSim(options.mode, !!options.ranked, options.entrants.map((e) => ({ hero: loadSimHero(env.db, e.heroId), team: e.team })), Math.floor(Math.random() * 1e9), weekOf(env.now()));
     this.sim.phase = 'countdown';
     this.sim.timer = 999; // ждём участников
     this.startedAt = env.now();
@@ -125,13 +126,15 @@ export class ArenaRoom extends SimRoom<ArenaSim> {
 
 /** Подбор соперников: дуэль — ближайший по рейтингу (окно растёт с ожиданием), 3×3 — «змейкой», волны — сразу. */
 export class ArenaQueue implements ArenaQueueApi {
-  private waiting: { heroId: string; mode: ArenaMode; ranked: boolean; rating: number; since: number }[] = [];
+  private waiting: { heroId: string; mode: ArenaMode; ranked: boolean; rating: number; since: number; guild: string | null }[] = [];
   private matched = new Map<string, QueueStatus>();
 
   enqueue(heroId: string, mode: ArenaMode, ranked: boolean): QueueStatus {
     const cur = this.status(heroId);
     if (cur.state !== 'idle') return cur;
-    this.waiting.push({ heroId, mode, ranked: mode === 'waves' ? false : ranked, rating: heroById(env.db, heroId).rating, since: env.now() });
+    const guild = memberOf(env.db, heroId)?.guild_id ?? null;
+    if (mode === 'raid' && !guild) throw new ApiError(403, 'raid_needs_guild');
+    this.waiting.push({ heroId, mode, ranked: mode === 'waves' || mode === 'raid' ? false : ranked, rating: heroById(env.db, heroId).rating, since: env.now(), guild });
     this.tryMatch();
     return this.status(heroId);
   }
@@ -154,6 +157,13 @@ export class ArenaQueue implements ArenaQueueApi {
 
   tryMatch(): void {
     const now = env.now();
+    // рейды: по гильдиям, от 4 до 6 человек
+    const raiders = new Map<string, typeof this.waiting>();
+    for (const w of this.waiting) if (w.mode === 'raid' && w.guild) (raiders.get(w.guild) ?? raiders.set(w.guild, []).get(w.guild)!).push(w);
+    for (const group0 of raiders.values()) {
+      if (group0.length < MODE_SIZE.raid) continue;
+      this.launch('raid', false, group0.slice(0, RAID_MAX));
+    }
     for (const mode of ['waves', 'duel', 'team'] as ArenaMode[])
       for (const ranked of [false, true]) {
         const pool = this.waiting.filter((w) => w.mode === mode && w.ranked === ranked).sort((a, b) => a.since - b.since);
@@ -168,16 +178,21 @@ export class ArenaQueue implements ArenaQueueApi {
             group = [a, b];
           } else group = pool.slice(0, need);
           for (const g of group) pool.splice(pool.indexOf(g), 1);
-          this.waiting = this.waiting.filter((w) => !group.includes(w));
-          const sorted = [...group].sort((x, y) => y.rating - x.rating);
-          // «змейка»: 1-й и 4-й, 5-й против 2-го, 3-го, 6-го — команды примерно равны
-          const teams = sorted.map((g, i) => ({ heroId: g.heroId, team: (mode === 'waves' ? 'A' : [0, 3, 4].includes(i) ? 'A' : 'B') as 'A' | 'B' }));
-          for (const g of group) this.matched.set(g.heroId, { state: 'queued', mode, since: g.since, size: need });
-          void matchMaker.createRoom('arena', { mode, ranked, entrants: teams }).then((room) => {
-            for (const g of group) this.matched.set(g.heroId, { state: 'matched', roomId: room.roomId, mode });
-          });
+          this.launch(mode, ranked, group);
         }
       }
+  }
+
+  private launch(mode: ArenaMode, ranked: boolean, group: typeof this.waiting): void {
+    this.waiting = this.waiting.filter((w) => !group.includes(w));
+    const sorted = [...group].sort((x, y) => y.rating - x.rating);
+    // «змейка»: 1-й, 4-й и 5-й против 2-го, 3-го и 6-го — команды примерно равны
+    const coop = mode === 'waves' || mode === 'raid';
+    const teams = sorted.map((g, i) => ({ heroId: g.heroId, team: (coop ? 'A' : [0, 3, 4].includes(i) ? 'A' : 'B') as 'A' | 'B' }));
+    for (const g of group) this.matched.set(g.heroId, { state: 'queued', mode, since: g.since, size: group.length });
+    void matchMaker.createRoom('arena', { mode, ranked, entrants: teams }).then((room) => {
+      for (const g of group) this.matched.set(g.heroId, { state: 'matched', roomId: room.roomId, mode });
+    });
   }
 }
 
