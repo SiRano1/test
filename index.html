@@ -79,6 +79,12 @@
   .lvl .thumb.loading{aspect-ratio:16/9;border-radius:10px;border:2px solid #d8bf8c;background:linear-gradient(90deg,#f1e3c2,#fff7e6,#f1e3c2);background-size:200% 100%;animation:shimmer 1.2s linear infinite}
   @keyframes shimmer{to{background-position:-200% 0}}
   @media (prefers-reduced-motion: reduce){ .lvl .thumb.loading{animation:none} .card{animation:none} }
+  .lvl.wide{grid-column:1/-1;background:#11141c;color:#e6f7ff}
+  .lvl.wide .thumb canvas{aspect-ratio:21/8;object-fit:cover;image-rendering:pixelated;border-color:#00e5ff}
+  .lvl.wide h3{color:#00e5ff}
+  .lvl.wide .num{background:#ff2bd6}
+  .lvl .badge{margin-left:auto;font-size:11px;font-weight:900;letter-spacing:1px;padding:3px 8px;border-radius:8px;background:#ff2bd6;color:#fff}
+  .lvl.wide .st{color:#ffd23f}
   .lvl .thumb canvas{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:10px;border:2px solid #d8bf8c}
   .lvl-head{display:flex;align-items:center;gap:8px}
   .lvl-head .num{flex:none;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:900;display:grid;place-items:center;border:2px solid var(--ink)}
@@ -163,6 +169,7 @@
 /* =====================================================================
    БАЗАРНЫЙ ПЕРЕПОЛОХ — игра «поиск предметов»
    Вся графика рисуется на Canvas, все звуки синтезируются через WebAudio.
+   Уровень «Этаж 796» — оригинальная сцена по мотивам Floor796 (floor796.com): пиксельный стиль, космическая станция.
    Структура:
      1. Константы и утилиты          8.  Генерация сцены
      2. Примитивы рисования          9.  Фоны локаций (зал, порт, замок, ночь)
@@ -331,6 +338,14 @@ function mkPerson(over = {}) {
     if (curTags.includes('castle')) o.hat = pick(['none', 'beret', 'feather', 'feather']);
   }
   if (over.hat === undefined && curTags.includes('castle') && over.shirt === undefined) o.shirt = pick(['#7b2cbf', '#a4161a', '#1d3557', '#2a9d8f', '#e9c46a', '#6a4c93', '#bc4749']);
+  if (curTags.includes('station') && over.suit === undefined && over.alien === undefined && over.hat === undefined && over.tele === undefined) {
+    const r = Math.random();
+    if (r < .2) { o.suit = true; o.suitC = pick(SUITC); }
+    else if (r < .4 && !kid) { o.alien = true; o.skin = pick(ALIENC); o.eyes = pick([1, 2]); }
+    else { o.hat = pick(['none', 'none', 'cap', 'bandana']); if (chance(.25)) o.visor = pick(NEON); }
+  }
+  if (o.suit) { o.shirt = o.pants = o.sleeve = o.suitC || '#eef1f5'; o.shoes = '#6b7280'; o.hat = 'none'; o.dress = false; o.apron = null; }
+  if (o.alien) { if (over.skin === undefined && !ALIENC.includes(o.skin)) o.skin = pick(ALIENC); o.hair = 'bald'; o.hairC = o.skin; o.beard = false; o.glasses = false; if (over.hat === undefined) o.hat = 'none'; }
   if (o.hat === 'top' && over.hatC === undefined) o.hatC = pick(TOPHATC);
   if (!o.beardC) o.beardC = o.hairC;
   if (!o.bookC) o.bookC = pick(['#c0392b', '#2980b9', '#27ae60', '#8e44ad']);
@@ -373,6 +388,16 @@ function drawHead(o, T) {
     dot(-8, -12, 3, 'rgba(255,255,255,.55)');
     return;
   }
+  if (o.alien) {
+    const bb = Math.sin(T * 4) * 2;
+    line(-6, -12, -11 + bb, -27, OUT, 1.6); line(6, -12, 11 - bb, -27, OUT, 1.6); circle(-11 + bb, -28, 3, o.skin); circle(11 - bb, -28, 3, o.skin);
+    ell(0, -1, 15, 16, o.skin);
+    const n = o.eyes || 2, xs = n === 1 ? [2] : n === 2 ? [-4, 8] : [-7, 2, 11], blink = ((T * .7 + o.seed) % 3.2) < .12;
+    for (const x of xs) { if (blink) line(x - 3, -3, x + 3, -3, OUT, 1.6); else { ell(x, -3, n === 1 ? 6 : 3.4, n === 1 ? 6 : 4.4, '#ffffff'); dot(x + 1, -3, n === 1 ? 3 : 1.9, '#111'); } }
+    g.beginPath(); g.arc(2, 8, 3.5, .2, Math.PI - .2); g.strokeStyle = OUT; g.lineWidth = 1.5; g.stroke();
+    if (o.hat && o.hat !== 'none') drawHat(o, T);
+    return;
+  }
   if (o.hair === 'long') rr(-16, -8, 32, o.dress ? 30 : 22, 10, hc);
   if (o.hair === 'pigtails') { circle(-18, 4, 6, hc); circle(18, 4, 6, hc); }
   circle(0, 0, 15, o.skin);
@@ -392,6 +417,7 @@ function drawHead(o, T) {
   else { dot(-4, -1, 2.3, OUT); dot(7, -1, 2.3, OUT); dot(-3.3, -1.8, .8, '#fff'); dot(7.7, -1.8, .8, '#fff'); }
   dot(-5, 6, 3, 'rgba(255,90,90,.25)'); dot(10, 6, 3, 'rgba(255,90,90,.25)');
   if (o.patch) { ell(7, -1, 4.5, 4, '#111'); line(-14, -7, 15, -5, '#111', 1.4); }
+  if (o.visor) { rr(-9, -5, 22, 7, 3, o.visor); dot(-4, -3, 1.5, 'rgba(255,255,255,.8)'); }
   dot(3.5, 3, 2.4, 'rgba(0,0,0,.15)');
   if (o.beard) {
     g.beginPath(); g.moveTo(-13, 3); g.quadraticCurveTo(1, 28, 15, 3); g.quadraticCurveTo(2, 12, -13, 3); fs(o.beardC);
@@ -445,6 +471,8 @@ function drawHeld(o, rx, ry, ra, T, ex, ey, p) {
       else { ell(rx, ry - 12, 12, 7, '#c26a2e'); limb(rx + 9, ry - 14, rx + 15, ry - 20, 3, '#c26a2e'); circle(rx + 16, ry - 21, 2.5, '#fff'); }
       break;
     }
+    case 'wrench': { limb(rx, ry, rx + dx * 20, ry + dy * 20, 3, '#9aa0a6'); circle(rx + dx * 22, ry + dy * 22, 4, '#9aa0a6'); dot(rx + dx * 24, ry + dy * 24, 2, '#1b1f27'); break; }
+    case 'camera': { rr(rx - 3, ry - 11, 16, 11, 2, '#333'); circle(rx + 7, ry - 5.5, 3.2, '#6fa8dc'); if ((T % 3) < .12) sparkle(rx + 5, ry - 14, 14, '#ffffff'); break; }
     case 'knife': limb(rx, ry, rx + dx * 18, ry + dy * 18, 2.2, '#dfe6ee'); break;
     case 'cloth': rr(rx - 4, ry - 2, 11, 8, 2, '#ffffff'); break;
     case 'apple': circle(rx + 4, ry - 3, 5.5, '#e53935'); line(rx + 4, ry - 8, rx + 5, ry - 11, '#5d4037', 1.5); ell(rx + 7, ry - 10, 3, 1.5, '#43a047', .4); break;
@@ -515,6 +543,12 @@ function drawPerson(e, t) {
   const fw = o.fat ? 1.3 : 1;
   const lg = p.legs || 0;
   g.save();
+  if (o.tele) g.globalAlpha = .3 + .5 * (.5 + .5 * Math.sin(T * 6));
+  if (o.hover) {
+    g.translate(0, -Math.sin(T * 3) * 3);
+    dot(4, 12, 16, 'rgba(0,229,255,.18)');
+    ell(4, 3, 27, 5, '#2b3240'); ell(4, 3, 21, 3, o.hoverC || '#00e5ff');
+  }
   g.translate(p.lean || 0, 0);
   // ноги
   if (o.sit) {                                          // сидит на бочке / ящике / троне
@@ -533,6 +567,7 @@ function drawPerson(e, t) {
   }
   g.translate(0, -(p.bob || 0));
   if (o.cape) poly([-16 * fw, -74, 16 * fw, -74, 26 * fw, -18, -26 * fw, -18], o.cape);
+  if (o.suit) rr(-21 * fw, -82, 42 * fw, 44, 7, '#aeb8c2');
   // туловище
   if (o.dress) {
     g.beginPath(); g.moveTo(-15, -77); g.lineTo(15, -77); g.lineTo(27, -14); g.quadraticCurveTo(0, -8, -27, -14); g.closePath(); fs(o.shirt);
@@ -541,8 +576,11 @@ function drawPerson(e, t) {
   if (o.pattern === 'jester') { for (let i = 0; i < 3; i++) poly([-8 + i * 8, -70, -4 + i * 8, -62, -8 + i * 8, -54, -12 + i * 8, -62], i % 2 ? '#ffd23f' : '#3ec1d3'); }
   if (o.apron) rr(-12 * fw, -62, 24 * fw, o.dress ? 44 : 32, 5, o.apron);
   if (!o.dress && !o.apron && !o.tabard) line(-16 * fw, -38, 16 * fw, -38, '#3b2a1a', 3);
+  if (o.suit) { rr(-9, -68, 18, 11, 2, '#3b4252'); for (let i = 0; i < 3; i++) dot(-5 + i * 5, -62.5, 1.7, (Math.floor(T * 3) + i) % 3 ? '#1b1f27' : '#7cff4f'); if (o.suitC === '#ff8c1a') rr(-17 * fw, -50, 34 * fw, 4, 1, '#ffffff'); }
   // голова
-  g.save(); g.translate(0, -95); g.rotate(p.head || 0); if (o.kid) g.scale(1.15, 1.15); drawHead(o, T); g.restore();
+  g.save(); g.translate(0, -95); g.rotate(p.head || 0); if (o.kid) g.scale(1.15, 1.15); drawHead(o, T);
+  if (o.suit && o.helmet !== false) { g.beginPath(); g.arc(0, -1, 21, 0, TAU); g.fillStyle = 'rgba(180,225,255,.28)'; g.fill(); g.strokeStyle = OUT; g.lineWidth = 1.8; g.stroke(); g.beginPath(); g.arc(0, -1, 16, Math.PI * 1.1, Math.PI * 1.45); g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 3; g.stroke(); ell(0, 18, 14, 4, '#aeb8c2'); }
+  g.restore();
   // руки
   const L = 27, sLx = -15 * fw, sRx = 15 * fw, sy = -70;
   const ex = sLx - Math.sin(p.la) * L, ey = sy + Math.cos(p.la) * L;
@@ -567,6 +605,7 @@ function drawPerson(e, t) {
     const cols = ['#ff4d6d', '#ffd23f', '#3ec1d3'];
     for (let i = 0; i < 3; i++) { const th = T * 4 + i * TAU / 3; circle(Math.cos(th) * 24, -135 - 34 * Math.abs(Math.sin(th)), 6, cols[i]); }
   }
+  if (o.tele) { g.globalAlpha = .6; const off = (T * 20) % 7; for (let y = -140; y < 0; y += 7) line(-26, y + off, 26, y + off, '#00e5ff', 1.2); g.globalAlpha = 1; }
   if (o.bubble) {
     const b = Array.isArray(o.bubble) ? o.bubble[Math.floor(T / 1.2) % o.bubble.length] : o.bubble;
     if (((T * .5 + o.seed) % 4) < 2.2) bubble(b, 16, o.hat === 'top' || o.hat === 'chef' || o.hat === 'witch' ? -158 : -140);
@@ -660,6 +699,11 @@ function drawDog(e, t) {
     if (o.pose === 'bark') { const m = Math.abs(Math.sin(T * 8)) * 4; poly([33, -33, 46, -31 + m, 36, -28 + m], '#7a1f2b'); }
     else if (wagging) ell(37, -29, 3, 5, '#ff7a8a');
     if (o.collar) rr(17, -32, 12, 4, 2, o.collar);
+    if (o.robot) {
+      line(24, -51, 21, -63, '#555', 1.6); circle(21, -64, 2.6, (Math.floor(T * 2) % 2) ? '#e63946' : '#6b1a1a');
+      dot(29, -43, 2.6, '#00e5ff'); line(-14, -27, 14, -27, '#6b7280', 1.4); line(-4, -38, -4, -16, '#6b7280', 1.2);
+      for (const x of [-17, -8, 14, 20]) dot(x, -11, 2, '#6b7280');
+    }
   }
   g.restore();
 }
@@ -1155,11 +1199,28 @@ function drawGoods(kind, T) {
     case 'pots': for (let i = 0; i < 5; i++) { const x = -76 + i * 38, c = ['#c1693c', '#a0522d', '#d2691e', '#8b4513', '#cd853f'][i]; g.beginPath(); g.moveTo(x - 6, top - 30); g.quadraticCurveTo(x - 20, top - 16, x - 8, top); g.lineTo(x + 8, top); g.quadraticCurveTo(x + 20, top - 16, x + 6, top - 30); g.closePath(); fs(c); } break;
     case 'flowers': for (let b = 0; b < 4; b++) { const x = -70 + b * 46; rr(x - 14, top - 18, 28, 18, 3, '#5d8aa8'); for (let i = 0; i < 5; i++) { const fx = x - 10 + i * 5, fy = top - 28 - (i % 3) * 6; line(fx, top - 16, fx, fy, '#2e7d32', 1.5); circle(fx, fy, 4, ['#ff5d8f', '#ffd23f', '#ff7b00', '#fff', '#c77dff'][(i + b) % 5]); } } break;
     case 'spices': for (let i = 0; i < 5; i++) { const x = -76 + i * 38, c = ['#d62828', '#f4a261', '#7a4a25', '#588157', '#ffd23f'][i]; rr(x - 15, top - 16, 30, 16, 4, '#d8c08a'); g.beginPath(); g.ellipse(x, top - 16, 13, 8, 0, Math.PI, 0); fs(c); } break;
+    case 'coffee': rr(-92, top - 40, 34, 40, 4, '#1b1f27'); dot(-75, top - 30, 3, '#e63946'); for (let i = 0; i < 6; i++) { const x = -40 + i * 22; rr(x - 6, top - 14, 12, 14, 2, '#fffbe6'); if (!ICON) { const u = (T * .6 + i / 6) % 1; g.globalAlpha = .5 * (1 - u); dot(x, top - 18 - u * 20, 3 + u * 3, '#ffffff'); g.globalAlpha = 1; } } break;
+    case 'parts': for (let i = 0; i < 5; i++) { const x = -76 + i * 38; circle(x, top - 12, 11, '#9aa0a6'); for (let k = 0; k < 8; k++) { const a = k * TAU / 8 + T * (i % 2 ? .5 : -.5); dot(x + Math.cos(a) * 12, top - 12 + Math.sin(a) * 12, 2.5, '#9aa0a6'); } dot(x, top - 12, 4, '#3b3f47'); } rr(-20, top - 8, 30, 8, 1, '#2e7d32'); break;
+    case 'noodles': for (let i = 0; i < 5; i++) { const x = -76 + i * 38; g.beginPath(); g.ellipse(x, top - 10, 15, 10, 0, 0, Math.PI); fs('#e63946'); ell(x, top - 10, 15, 4, '#f4d58d'); line(x + 4, top - 12, x + 14, top - 30, '#8b5a2b', 1.5); line(x + 7, top - 12, x + 17, top - 28, '#8b5a2b', 1.5); if (!ICON) { const u = (T * .5 + i / 5) % 1; g.globalAlpha = .45 * (1 - u); dot(x - 4, top - 16 - u * 22, 3 + u * 4, '#ffffff'); g.globalAlpha = 1; } } break;
+    case 'gadgets': for (let i = 0; i < 5; i++) { const x = -76 + i * 38; rr(x - 13, top - 22, 26, 20, 3, '#1b1f27'); rr(x - 10, top - 19, 20, 14, 2, NEON[(i + Math.floor(T)) % 4]); } break;
+    case 'flora': for (let i = 0; i < 5; i++) { const x = -76 + i * 38; for (let k = 0; k < 3; k++) { const tx = x - 6 + k * 6 + Math.sin(T * 2 + i + k) * 3, ty = top - 26 - (k % 2) * 8; line(x, top - 10, tx, ty, '#2e9e6f', 2); circle(tx, ty, 3.5, NEON[(i + k) % 4]); } rr(x - 9, top - 12, 18, 12, 3, '#3b4252'); } break;
     case 'candy': for (let i = 0; i < 4; i++) { const x = -66 + i * 44; rr(x - 13, top - 30, 26, 30, 6, 'rgba(210,240,255,.7)'); for (let k = 0; k < 5; k++) dot(x - 7 + (k % 3) * 7, top - 8 - Math.floor(k / 3) * 8, 3.5, ['#ff4d6d', '#ffd23f', '#3ec1d3', '#06d6a0', '#9d4edd'][(k + i) % 5]); rr(x - 9, top - 34, 18, 5, 2, '#e63946'); } break;
   }
 }
 function drawStall(e, t) {
   const o = e.o, T = t + e.phase, S = STALLS[o.kind];
+  if (o.neon) {
+    limb(-95, -2, -95, -176, 6, '#6b7280'); limb(95, -2, 95, -176, 6, '#6b7280');
+    rr(-106, -60, 212, 60, 4, '#2b3240');
+    for (let i = -80; i <= 80; i += 40) line(i, -56, i, -4, '#3b4252', 2);
+    drawGoods(o.kind, T);
+    rr(-114, -206, 228, 30, 5, '#3b4252');
+    const fl = Math.sin(T * 23 + e.id) > .97 ? .3 : 1;
+    g.globalAlpha = .25 * fl; line(-110, -176, 110, -176, S.awn, 10); line(-104, -30, 104, -30, S.awn, 9);
+    g.globalAlpha = fl; line(-110, -176, 110, -176, S.awn, 3.5); line(-104, -30, 104, -30, S.awn, 3); g.globalAlpha = 1;
+    rr(-54, -232, 108, 28, 5, '#1b1f27'); g.globalAlpha = fl; label(S.sign, 0, -218, 14, S.awn); g.globalAlpha = 1;
+    return;
+  }
   limb(-95, -2, -95, -176, 7, '#8b5a2b'); limb(95, -2, 95, -176, 7, '#8b5a2b');
   rr(-106, -60, 212, 60, 4, '#a0522d');
   for (let i = -80; i <= 80; i += 32) line(i, -58, i, -2, '#7a3e1f', 1.4);
@@ -1193,6 +1254,8 @@ function personBox(e) {
   if (e.anim === 'juggle') b[1] = -178;
   if (o.held === 'crateUp') b[1] = -135;
   if (o.held === 'rod') { b[2] = 95; b[1] = -150; }
+  if (o.hover) b[3] = 8;
+  if (o.alien) b[1] = Math.min(b[1], -130);
   if (o.sit) { b[3] = e.z || 0; b[2] = 34; }
   return b;
 }
@@ -1243,8 +1306,11 @@ const LEVELS = [
     desc: 'Пристань у моря: моряки, пираты, чайки и крабы среди ящиков и сетей.' },
   { id: 'castle', name: 'Пир в замке', tags: ['castle'], bg: 'castle', targets: 13, ents: 680, feasts: 8,
     desc: 'Король закатил пир! Рыцари, шуты, музыканты и собаки под столами.' },
-  { id: 'night', name: 'Ночной базар', tags: ['market', 'night'], bg: 'hall', night: true, targets: 15, ents: 700, stalls: 14,
+  { id: 'night', name: 'Ночной базар', tags: ['market', 'night'], bg: 'hall', night: true, dark: .78, targets: 15, ents: 700, stalls: 14,
     desc: 'Темно! Светят только фонари — и твой фонарик вокруг курсора.' },
+  { id: 'floor796', name: 'Этаж 796', tags: ['station'], bg: 'station', pixel: true, dark: .36, targets: 14, ents: 760, stalls: 5,
+    modules: ['shuttle', 'teleportHub', 'arcade', 'lab', 'holo', 'shuttle', 'arcade', 'lab', 'teleportHub'],
+    desc: 'Космическая станция 2175 года в пиксельном стиле, как на Floor796: роботы, пришельцы, телепорты, дроны и шаттлы.' },
 ];
 const ALL = ['market', 'port', 'castle'];
 
@@ -1385,17 +1451,18 @@ const TARGET_POOL = [
 const CHAT = {
   market: ['Привет!', 'Почём?', 'Ха-ха!', 'Правда?', 'Смотри!', 'Ого!', 'Слышал?', 'Ну и ну!', 'Дёшево!', 'Беру!'],
   port: ['Йо-хо-хо!', 'Свежий улов!', 'Шторм идёт!', 'Эй, на палубе!', 'Полный вперёд!', 'Ха-ха!', 'Земля!'],
+  station: ['Бип-буп!', 'Этаж 796!', 'Где мой шаттл?', 'Кофе на орбите!', 'Телепорт сломан!', 'Какой сейчас год?', 'Ха-ха!', 'Лифт опять застрял!'],
   castle: ['За короля!', 'Ура!', 'Вкусно!', 'Ещё вина!', 'Какой пир!', 'Ваше здоровье!', 'Ха-ха!'],
 };
-function chat() { const k = curTags.includes('port') ? 'port' : curTags.includes('castle') ? 'castle' : 'market'; return shuffle(CHAT[k].slice()).slice(0, 2); }
+function chat() { const k = curTags.includes('station') ? 'station' : curTags.includes('port') ? 'port' : curTags.includes('castle') ? 'castle' : 'market'; return shuffle(CHAT[k].slice()).slice(0, 2); }
 const BIRD = () => curTags.includes('port') ? 'gull' : 'pigeon';
 
 const GROUPS = [
-  { th: ALL, wgt: 8, w: 100, d: 30, build: (x, y) => { const s = s_(y); P(x - 24 * s, y, { bubble: chat() }, pick(['shout', 'nod', 'idle']), 1); P(x + 24 * s, y + .5, { bubble: chat() }, pick(['nod', 'wave', 'argue']), -1); } },
-  { th: ALL, wgt: 4, w: 140, d: 30, build: (x, y) => { const s = s_(y); P(x - 42 * s, y, { dress: true, bubble: chat() }, 'shout', 1); P(x, y - 4, { dress: true }, 'nod', pick([1, -1])); P(x + 42 * s, y, { dress: true, bubble: chat() }, 'argue', -1); } },
-  { th: ALL, wgt: 3, w: 100, d: 30, build: (x, y) => { const s = s_(y); const a = P(x - 41 * s, y, { bubble: 'Договорились!' }, 'shake', 1); P(x + 41 * s, y, {}, 'shake', -1).phase = a.phase; } },
+  { th: ALL.concat('station'), wgt: 8, w: 100, d: 30, build: (x, y) => { const s = s_(y); P(x - 24 * s, y, { bubble: chat() }, pick(['shout', 'nod', 'idle']), 1); P(x + 24 * s, y + .5, { bubble: chat() }, pick(['nod', 'wave', 'argue']), -1); } },
+  { th: ALL.concat('station'), wgt: 4, w: 140, d: 30, build: (x, y) => { const s = s_(y); P(x - 42 * s, y, { dress: true, bubble: chat() }, 'shout', 1); P(x, y - 4, { dress: true }, 'nod', pick([1, -1])); P(x + 42 * s, y, { dress: true, bubble: chat() }, 'argue', -1); } },
+  { th: ALL.concat('station'), wgt: 3, w: 100, d: 30, build: (x, y) => { const s = s_(y); const a = P(x - 41 * s, y, { bubble: 'Договорились!' }, 'shake', 1); P(x + 41 * s, y, {}, 'shake', -1).phase = a.phase; } },
   {
-    th: ['market', 'port'], wgt: 4, w: 140, d: 30, build: (x, y) => {
+    th: ['market', 'port', 'station'], wgt: 4, w: 140, d: 30, build: (x, y) => {
       const s = s_(y);
       const p = P(x - 40 * s, y, { held: 'leash' }, 'hold', 1);
       const d = ent('dog', x + 32 * s, y + 1, { color: pick(DOGC), pose: pick(['stand', 'wag']), collar: '#e63946', spot: chance(.3) ? '#5a3825' : null }, { flip: 1 });
@@ -1411,9 +1478,9 @@ const GROUPS = [
       for (let i = 0; i < 4; i++) ent(port ? 'pigeon' : pick(['pigeon', 'sparrow', 'chicken']), x + (i - .5) * 22 * s, y + rnd(-4, 4), { gull: port, color: pick(['#f7f3ea', '#b5652b', '#9aa3ad']) }, { flip: chance(.5) ? 1 : -1 });
     }
   },
-  { th: ALL, wgt: 3, w: 120, d: 25, build: (x, y) => { const s = s_(y); ent('cat', x - 26 * s, y, { color: pick(CATC), pose: 'reach', hat: chance(.3) ? pick(CAT_HATC) : null }, { flip: 1 }); ent('mouse', x + 26 * s, y + 1, { run: true }, { flip: 1 }); } },
+  { th: ALL.concat('station'), wgt: 3, w: 120, d: 25, build: (x, y) => { const s = s_(y); ent('cat', x - 26 * s, y, { color: pick(CATC), pose: 'reach', hat: chance(.3) ? pick(CAT_HATC) : null }, { flip: 1 }); ent('mouse', x + 26 * s, y + 1, { run: true }, { flip: 1 }); } },
   {
-    th: ALL, wgt: 3, w: 130, d: 30, build: (x, y) => {
+    th: ALL.concat('station'), wgt: 3, w: 130, d: 30, build: (x, y) => {
       const s = s_(y);
       ent('dog', x - 36 * s, y, { color: pick(DOGC), pose: 'bark', say: 'Гав!', collar: pick(['#1d6fe0', '#2ecc71']) }, { flip: 1 });
       ent('barrel', x + 34 * s, y - 1, {});
@@ -1421,7 +1488,7 @@ const GROUPS = [
     }
   },
   { th: ['market'], wgt: 3, w: 150, d: 30, build: (x, y) => { const s = s_(y); P(x - 48 * s, y, { kid: true, beard: false, bubble: 'Лови!' }, 'chase', 1); ent('chicken', x, y + 1, { color: pick(['#f7f3ea', '#b5652b']), flap: true }, { flip: 1 }); P(x + 48 * s, y, { kid: true, beard: false }, 'chase', -1); } },
-  { th: ALL, wgt: 3, w: 110, d: 30, build: (x, y) => { const s = s_(y); const a = P(x - 28 * s, y, { dress: chance(.6) }, 'holdHand', 1); P(a.x + 57 * s, y + .5, { kid: true, beard: false, bubble: pick(['Мама, смотри!', 'Хочу пряник!', 'Пап, пошли!']) }, 'reachUp', 1); } },
+  { th: ALL.concat('station'), wgt: 3, w: 110, d: 30, build: (x, y) => { const s = s_(y); const a = P(x - 28 * s, y, { dress: chance(.6) }, 'holdHand', 1); P(a.x + 57 * s, y + .5, { kid: true, beard: false, bubble: pick(['Мама, смотри!', 'Хочу пряник!', 'Пап, пошли!']) }, 'reachUp', 1); } },
   {
     th: ['market', 'port'], wgt: 3, w: 160, d: 30, build: (x, y) => {
       const s = s_(y);
@@ -1431,7 +1498,7 @@ const GROUPS = [
     }
   },
   {
-    th: ALL, wgt: 4, w: 100, d: 30, build: (x, y) => {
+    th: ALL.concat('station'), wgt: 4, w: 100, d: 30, build: (x, y) => {
       const s = s_(y);
       ent('barrel', x, y, {});
       P(x, y + .5, { sit: true, held: pick(['apple', 'bread', 'mug']) }, 'eat', 1, { z: 14 });
@@ -1458,9 +1525,9 @@ const GROUPS = [
       P(x - 62 * s, y, { kid: true, beard: false, held: 'grain', grainC: '#d49a4a' }, 'feed', 1);
     }
   },
-  { th: ALL, wgt: 2, w: 140, d: 30, build: (x, y) => { const s = s_(y); ent('easel', x + 12 * s, y + 1, {}, { flip: 1 }); P(x - 28 * s, y, { hat: 'beret', hatC: pick(HATC), held: 'paintbrush' }, 'paint', 1); P(x + 76 * s, y - 2, { bubble: 'Я красивый?' }, 'idle', -1); } },
+  { th: ALL.concat('station'), wgt: 2, w: 140, d: 30, build: (x, y) => { const s = s_(y); ent('easel', x + 12 * s, y + 1, {}, { flip: 1 }); P(x - 28 * s, y, { hat: 'beret', hatC: pick(HATC), held: 'paintbrush' }, 'paint', 1); P(x + 76 * s, y - 2, { bubble: 'Я красивый?' }, 'idle', -1); } },
   {
-    th: ALL, wgt: 2, w: 150, d: 30, build: (x, y) => {
+    th: ALL.concat('station'), wgt: 2, w: 150, d: 30, build: (x, y) => {
       const s = s_(y);
       const d = P(x - 30 * s, y, { dress: false, held: 'drum' }, 'drum', 1); d.snd = { k: 'drum', per: Math.PI / 6 };
       const h = ent('hatItem', x + 18 * s, y + 3, { kind: 'top', color: '#222222', coins: true });
@@ -1469,7 +1536,7 @@ const GROUPS = [
   },
   { th: ['market', 'castle'], wgt: 2, w: 130, d: 30, build: (x, y) => { const s = s_(y); ent('fortuneTable', x, y + 2, {}); P(x - 4 * s, y - 10, { dress: true, hat: 'kerchief', hatC: '#6a2c91', bubble: 'Вижу судьбу!' }, 'pet', 1); P(x + 62 * s, y, { bubble: 'Что меня ждёт?' }, 'nod', -1); } },
   {
-    th: ALL, wgt: 2, w: 150, d: 25, build: (x, y) => {
+    th: ALL.concat('station'), wgt: 2, w: 150, d: 25, build: (x, y) => {
       const s = s_(y);
       const a = P(x - 48 * s, y, { kid: true, beard: false, held: 'rope', flag: true, bubble: 'Тяни!' }, 'pull', -1);
       const b = P(x + 48 * s, y, { kid: true, beard: false }, 'pull', 1);
@@ -1477,9 +1544,9 @@ const GROUPS = [
     }
   },
   { th: ['market'], wgt: 2, w: 120, d: 25, build: (x, y) => { const s = s_(y); ent('grain', x, y - 3, {}); ent('chicken', x - 30 * s, y, { color: pick(['#e8e0d0', '#b5652b']), rooster: true, say: 'Кукареку!' }, { flip: 1 }); ent('chicken', x + 10 * s, y + 1, { color: '#f7f3ea' }); ent('chicken', x + 38 * s, y - 1, { color: '#b5652b' }, { flip: -1 }); } },
-  { th: ALL, wgt: 2, w: 110, d: 25, build: (x, y) => { const s = s_(y); ent('sack', x, y, {}); ent('mouse', x + 24 * s, y + 1, { nibble: true }, { flip: -1 }); ent('cat', x - 40 * s, y - 2, { color: pick(CATC), pose: 'reach' }, { flip: 1 }); } },
+  { th: ALL.concat('station'), wgt: 2, w: 110, d: 25, build: (x, y) => { const s = s_(y); ent('sack', x, y, {}); ent('mouse', x + 24 * s, y + 1, { nibble: true }, { flip: -1 }); ent('cat', x - 40 * s, y - 2, { color: pick(CATC), pose: 'reach' }, { flip: 1 }); } },
   {
-    th: ALL, wgt: 2, w: 130, d: 30, build: (x, y) => {
+    th: ALL.concat('station'), wgt: 2, w: 130, d: 30, build: (x, y) => {
       const s = s_(y); ent('table', x, y, {});
       const a = P(x - 55 * s, y - 1, { held: 'mug', bubble: 'Будем!' }, 'toast', 1); a.snd = { k: 'clink', per: 3, off: .4 };
       P(x + 55 * s, y - 1, { held: 'mug' }, 'toast', -1).phase = a.phase;
@@ -1508,6 +1575,264 @@ const GROUPS = [
   { th: ['night'], wgt: 6, w: 110, d: 30, build: (x, y) => { const s = s_(y); P(x - 20 * s, y, { held: 'lamp', lampC: pick(LAMPC) }, 'hold', 1); P(x + 34 * s, y, { bubble: ['Темно!', 'Сюда свети!'] }, 'nod', -1); } },
   { th: ['night'], wgt: 3, w: 110, d: 30, build: (x, y) => { const s = s_(y); P(x - 20 * s, y, { bubble: 'Звезда падает!' }, 'pointUp', 1); P(x + 28 * s, y, { kid: true, beard: false, bubble: 'Где?' }, 'jump', -1); } },
 ];
+
+/* ---------------- 7b. Этаж 796: космическая станция ----------------
+   Отдельный уровень в духе Floor796: пиксельная графика, роботы, пришельцы, телепорты. */
+const ROBOTC = ['#9aa7b8', '#d9d2c3', '#d95d5d', '#6fa8dc', '#c0c7d1'];   // золотого нет — это цель
+const ALIENC = ['#7ed957', '#b388ff', '#6fd3d6', '#ff9fb2'];
+const SUITC = ['#eef1f5', '#dfe7f2', '#cfe0ff'];                         // оранжевого нет — это цель
+const NEON = ['#00e5ff', '#ff2bd6', '#7cff4f', '#ffd23f'];
+const blinkC = (T, i, cols) => cols[(Math.floor(T * 3) + i) % cols.length];
+
+function drawRobot(e, t) {
+  const o = e.o, T = t + e.phase, c = o.color || '#9aa7b8';
+  if (o.kind === 'droid') {
+    const bob = Math.sin(T * 3) * 1.5, look = Math.sin(T * .8) * 4;
+    ell(0, -4, 10, 4, '#3b3f47');
+    rr(-12, -30 + bob, 24, 26, 6, c);
+    g.beginPath(); g.arc(0, -30 + bob, 12, Math.PI, 0); g.closePath(); fs(shade(c, .25));
+    circle(look, -36 + bob, 4.5, '#1b1f27'); dot(look, -36 + bob, 2.2, NEON[0]);
+    line(-10, -20 + bob, 10, -20 + bob, shade(c, -.3), 1.5);
+    dot(-5, -13 + bob, 2, blinkC(T, 0, ['#e63946', '#7cff4f'])); dot(1, -13 + bob, 2, blinkC(T, 1, ['#e63946', '#7cff4f']));
+    return;
+  }
+  if (o.kind === 'cleaner') {
+    const sway = Math.sin(T * .9) * 12;
+    g.save(); g.translate(sway, 0);
+    if (!ICON) for (let i = 0; i < 3; i++) { const u = (T * 1.5 + i / 3) % 1; dot(-24 * Math.sign(Math.cos(T * .9)) - u * 10, -3 - u * 4, 2.5 * (1 - u), 'rgba(160,160,170,.5)'); }
+    ell(0, -4, 21, 6, '#3b3f47'); ell(0, -8, 20, 6, c); ell(0, -9, 8, 3, shade(c, .3));
+    dot(13, -8, 1.8, blinkC(T, 0, ['#7cff4f', '#1b1f27']));
+    const a = T * 14; line(18, -3, 18 + Math.cos(a) * 5, -3 + Math.sin(a) * 2, '#555', 1.2); line(18, -3, 18 - Math.cos(a) * 5, -3 - Math.sin(a) * 2, '#555', 1.2);
+    if (o.cat) { g.save(); g.translate(0, -10); g.scale(.85, .85); drawCat({ o: { color: o.cat, pose: 'sit', seed: o.seed }, phase: e.phase }, t); g.restore(); }
+    g.restore(); return;
+  }
+  const p = (POSES[e.anim] || POSES.idle)(T, e);
+  rr(-18, -12, 36, 12, 5, '#3b3f47');
+  for (const x of [-11, 0, 11]) { circle(x, -6, 4, '#6b7280'); const a = T * 4; line(x, -6, x + Math.cos(a) * 3.5, -6 + Math.sin(a) * 3.5, '#2b2f36', 1.2); }
+  g.save(); g.translate(p.lean || 0, -Math.abs(p.bob || 0) * .5);
+  limb(0, -12, 0, -16, 6, '#555');
+  rr(-16, -50, 32, 36, 5, c);
+  rr(-10, -44, 20, 13, 2, '#1b1f27');
+  for (let i = 0; i < 3; i++) dot(-6 + i * 6, -37.5, 2, blinkC(T, i, ['#e63946', '#7cff4f', '#ffd23f']));
+  for (let i = 0; i < 3; i++) line(-10, -26 + i * 4, 10, -26 + i * 4, shade(c, -.25), 1.2);
+  if (o.repair && !ICON) {
+    const u = (T * 2) % 1;
+    if (u < .5) for (let i = 0; i < 6; i++) { const a = -Math.PI / 2 + (hash(i + e.id) - .5) * 2.6; line(Math.cos(a) * u * 20, -38 + Math.sin(a) * u * 16, Math.cos(a) * u * 44, -38 + Math.sin(a) * u * 34, i % 2 ? '#ffd23f' : '#ff7b00', 2); }
+  }
+  limb(0, -50, 0, -54, 4, '#555');
+  g.save(); g.translate(0, -64); g.rotate(p.head || 0);
+  line(0, -10, 0, -20, OUT, 1.6); circle(0, -21, 3, blinkC(T, 0, ['#e63946', '#6b1a1a']));
+  rr(-14, -10, 28, 20, 5, c);
+  rr(-10, -7, 20, 12, 3, '#1b1f27');
+  if (((T * .6 + o.seed) % 3) < .12) { line(-7, -1.5, -2, -1.5, NEON[0], 1.5); line(3, -1.5, 8, -1.5, NEON[0], 1.5); }
+  else { rr(-7, -4, 5, 5, 1, NEON[0]); rr(3, -4, 5, 5, 1, NEON[0]); }
+  g.restore();
+  const L = 22, sy = -44;
+  const ex = -16 - Math.sin(p.la) * L, ey = sy + Math.cos(p.la) * L, rx = 16 + Math.sin(p.ra) * L, ry = sy + Math.cos(p.ra) * L;
+  limb(-16, sy, ex, ey, 4.5, shade(c, -.15)); limb(16, sy, rx, ry, 4.5, shade(c, -.15));
+  if (o.held) drawHeld(o, rx, ry, p.ra, T, ex, ey, p);
+  circle(ex, ey, 3.5, '#6b7280'); circle(rx, ry, 3.5, '#6b7280');
+  g.restore();
+}
+function drawDrone(e, t) {
+  const o = e.o, T = t + e.phase, hov = Math.sin(T * 2.5) * 4;
+  g.save(); g.translate(0, hov);
+  if (o.cargo) {
+    line(-6, -10, -8, 3, '#555', 1); line(6, -10, 8, 3, '#555', 1);
+    if (o.cargo === 'pizza') { ell(0, 8, 17, 6, '#d49a4a'); ell(0, 7, 14, 4.5, '#f4c542'); for (let i = 0; i < 4; i++) dot(-8 + i * 5.5, 6 + (i % 2) * 2, 1.8, '#c0392b'); }
+    else { rr(-10, 2, 20, 14, 2, '#c8964f'); line(0, 2, 0, 16, '#8b5a2b', 1.5); }
+  }
+  limb(-14, -14, -27, -18, 2.5, '#555'); limb(14, -14, 27, -18, 2.5, '#555');
+  rr(-14, -17, 28, 9, 3, o.color || '#3b3f47');
+  for (const sx of [-27, 27]) { limb(sx, -18, sx, -21, 2, '#555'); ell(sx, -22, Math.max(1, 11 * Math.abs(Math.cos(T * 40 + sx))), 2, 'rgba(200,220,255,.7)'); }
+  dot(0, -12, 2, blinkC(T, 0, ['#e63946', '#7cff4f']));
+  g.restore();
+}
+function drawUfo(e, t) {
+  const o = e.o, T = t + e.phase, hov = Math.sin(T * 1.5) * 6;
+  g.save(); g.globalAlpha = .28 + .1 * Math.sin(T * 6); g.fillStyle = '#9ff7ff';
+  g.beginPath(); g.moveTo(-14, -104 + hov); g.lineTo(14, -104 + hov); g.lineTo(36, 0); g.lineTo(-36, 0); g.closePath(); g.fill(); g.restore();
+  if (o.cargo) {
+    const u = (T * .3) % 1;
+    g.save(); g.translate(0, -8 - u * 80); g.rotate(Math.sin(T * 3) * .4);
+    ell(0, -6, 8, 6, '#f7f3ea'); circle(6, -12, 4, '#f7f3ea'); dot(5, -17, 2, '#e63946'); poly([9, -12, 13, -11, 9, -10], '#f4a100');
+    g.restore();
+  }
+  g.save(); g.translate(0, -112 + hov);
+  ell(0, -10, 16, 12, 'rgba(170,230,255,.85)'); circle(0, -10, 6, '#7ed957'); dot(-2, -11, 1.5, '#111'); dot(2, -11, 1.5, '#111');
+  ell(0, 0, 42, 10, '#aeb8c2'); ell(0, 4, 26, 5, '#6b7280');
+  for (let i = 0; i < 7; i++) dot(-33 + i * 11, 1, 2.8, (Math.floor(T * 6) + i) % 3 === 0 ? '#ffd23f' : '#e63946');
+  g.restore();
+}
+function drawTeleport(e, t) {
+  const o = e.o, T = t + e.phase, on = o.active || (o.auto && (T % 5) < 2.2);
+  limb(-36, -4, -36, -150, 4, '#6b7280'); limb(36, -4, 36, -150, 4, '#6b7280'); rr(-42, -158, 84, 12, 5, '#3b4252');
+  for (let i = 0; i < 5; i++) dot(-28 + i * 14, -152, 2.2, on ? '#00e5ff' : '#35505a');
+  ell(0, -5, 36, 10, '#3b4252'); ell(0, -8, 30, 7, '#1b1f27');
+  g.beginPath(); g.ellipse(0, -8, 24, 5, 0, 0, TAU); g.strokeStyle = on ? '#00e5ff' : '#2b6c78'; g.lineWidth = 3; g.stroke();
+  if (on) {
+    const gr = g.createLinearGradient(0, -150, 0, -8); gr.addColorStop(0, 'rgba(0,229,255,0)'); gr.addColorStop(1, 'rgba(0,229,255,.45)');
+    g.fillStyle = gr; g.fillRect(-26, -146, 52, 138);
+    for (let i = 0; i < 8; i++) { const u = ((T * .8 + i / 8) % 1); dot(-20 + hash(i + e.id) * 40, -10 - u * 134, 1.8, `rgba(200,255,255,${1 - u})`); }
+  }
+}
+function drawHoloStage(e, t) {
+  const o = e.o, T = t + e.phase;
+  ell(0, -6, 34, 9, '#3b4252'); ell(0, -9, 26, 6, '#00e5ff');
+  const gr = g.createLinearGradient(0, -160, 0, -10); gr.addColorStop(0, 'rgba(0,229,255,0)'); gr.addColorStop(1, 'rgba(0,229,255,.3)');
+  g.fillStyle = gr; g.beginPath(); g.moveTo(-26, -10); g.lineTo(26, -10); g.lineTo(42, -160); g.lineTo(-42, -160); g.closePath(); g.fill();
+  g.save(); g.globalAlpha = Math.sin(T * 37) > .9 ? .25 : .7; g.translate(0, -10);
+  drawPerson({ o: o.fig, anim: e.anim, phase: e.phase, z: 0 }, t);
+  g.restore();
+  g.globalAlpha = .35; for (let y = -150; y < -10; y += 6) line(-30, y + (T * 18) % 6, 30, y + (T * 18) % 6, '#9ff7ff', 1); g.globalAlpha = 1;
+  if ((T % 4) < 2) bubble('♪ ла-ла-ла ♪', 20, -176, 11);
+}
+function drawHoloTable(e, t) {
+  const T = t + e.phase;
+  ell(0, -4, 18, 5, '#3b4252'); limb(0, -32, 0, -6, 6, '#6b7280'); rr(-30, -40, 60, 8, 3, '#3b4252');
+  g.fillStyle = 'rgba(0,229,255,.18)'; g.beginPath(); g.moveTo(-8, -40); g.lineTo(8, -40); g.lineTo(22, -72); g.lineTo(-22, -72); g.closePath(); g.fill();
+  circle(0, -72, 16, 'rgba(0,229,255,.35)');
+  g.strokeStyle = '#9ff7ff'; g.lineWidth = 1;
+  for (let k = 0; k < 3; k++) { const a = T + k * 1.05; g.beginPath(); g.ellipse(0, -72, Math.max(.5, Math.abs(Math.cos(a)) * 16), 16, 0, 0, TAU); g.stroke(); }
+  g.beginPath(); g.ellipse(0, -72, 26, 6, -.3, 0, TAU); g.stroke();
+}
+function drawVending(e, t) {
+  const T = t + e.phase;
+  rr(-24, -104, 48, 104, 4, '#2b3240'); rr(-19, -96, 30, 64, 2, '#0b1a2a');
+  for (let r = 0; r < 4; r++) for (let c = 0; c < 3; c++) rr(-17 + c * 9.5, -92 + r * 15, 7, 11, 2, ['#e63946', '#ffd23f', '#7cff4f', '#00e5ff', '#ff2bd6'][(r + c + e.id) % 5]);
+  rr(14, -92, 7, 26, 2, '#1b1f27'); for (let k = 0; k < 4; k++) dot(17.5, -88 + k * 6, 1.5, '#7cff4f');
+  rr(-19, -26, 30, 10, 2, '#111');
+  rr(-24, -118, 48, 14, 3, '#1b1f27'); label('НАПИТКИ', 0, -111, 7.5, '#ff2bd6');
+  g.globalAlpha = Math.sin(T * 29) > .95 ? .3 : 1; line(-23, -103, 23, -103, '#ff2bd6', 3); line(-23, -2, 23, -2, '#ff2bd6', 3); g.globalAlpha = 1;
+}
+function drawArcade(e, t) {
+  const T = t + e.phase, c = e.o.color || '#6a4c93';
+  poly([-22, 0, 22, 0, 22, -60, 26, -72, 26, -120, -26, -120, -26, -72, -22, -60], c);
+  rr(-24, -134, 48, 16, 3, '#1b1f27'); label('ИГРА', 0, -126, 9, NEON[e.id % 4]);
+  rr(-18, -112, 36, 32, 2, '#0b0b18');
+  for (let i = 0; i < 5; i++) rr(-15 + i * 6.5, -108, 5, 3, 0, NEON[i % 4]);
+  const px = Math.sin(T * 2.3) * 12;
+  rr(px - 5, -85, 10, 2, 0, '#7cff4f'); dot(Math.sin(T * 2.3 + .3) * 13, -88 - Math.abs(Math.sin(T * 3.1)) * 14, 2, '#ffffff');
+  poly([-24, -72, 24, -72, 28, -60, -28, -60], '#2b3240');
+  limb(-10, -66, -10 + Math.sin(T * 5) * 3, -75, 2, '#111'); circle(-10 + Math.sin(T * 5) * 3, -76, 3, '#e63946');
+  dot(6, -66, 2.5, '#ffd23f'); dot(14, -66, 2.5, '#00e5ff');
+}
+function drawCryo(e, t) {
+  const o = e.o, T = t + e.phase, skin = o.alien ? '#7ed957' : '#f1c27d';
+  rr(-22, -112, 44, 112, 20, '#aeb8c2'); rr(-15, -102, 30, 90, 14, '#0b1a2a');
+  rr(-8, -68, 16, 44, 6, o.alien ? '#4a2c6f' : '#6d7a8a');
+  if (o.alien) { line(-4, -88, -8, -98, OUT, 1.4); line(4, -88, 8, -98, OUT, 1.4); circle(-8, -99, 2, skin); circle(8, -99, 2, skin); }
+  circle(0, -80, 9, skin);
+  line(-5, -81, -1, -81, OUT, 1.3); line(2, -81, 6, -81, OUT, 1.3);
+  if (o.alien) line(-1, -81, 1.5, -81, OUT, 1.3);
+  rr(-15, -102, 30, 90, 14, 'rgba(160,220,255,.35)'); line(-9, -94, -9, -24, 'rgba(255,255,255,.55)', 2);
+  for (let i = 0; i < 6; i++) dot(-10 + hash(i + e.id) * 20, -96 + hash(i * 3 + e.id) * 80, 1.5, 'rgba(255,255,255,.7)');
+  for (let i = 0; i < 3; i++) dot(-10 + i * 10, -6, 2, blinkC(T, i, ['#00e5ff', '#1b1f27', '#1b1f27']));
+  if (!ICON) for (let i = 0; i < 3; i++) { const u = (T * .4 + i / 3) % 1; g.globalAlpha = .4 * (1 - u); dot(-14 + i * 14 + u * 6, -4 - u * 14, 5 + u * 5, '#dff6ff'); g.globalAlpha = 1; }
+}
+function drawConsole(e, t) {
+  const T = t + e.phase;
+  limb(0, -50, 0, -56, 3, '#6b7280'); rr(-18, -80, 36, 24, 3, '#0b1a2a');
+  for (let i = 0; i < 5; i++) { const h = 4 + 14 * Math.abs(Math.sin(T * 2 + i)); rr(-14 + i * 6.5, -60 - h, 4, h, 0, NEON[i % 4]); }
+  poly([-30, 0, 30, 0, 30, -36, 24, -50, -24, -50, -30, -36], '#3b4252');
+  rr(-20, -46, 40, 10, 2, '#1b1f27');
+  g.beginPath(); for (let x = -18; x <= 18; x += 3) { const y = -41 + Math.sin(x * .4 + T * 5) * 3; x === -18 ? g.moveTo(x, y) : g.lineTo(x, y); } g.strokeStyle = '#7cff4f'; g.lineWidth = 1.2; g.stroke();
+  for (let i = 0; i < 5; i++) for (let r = 0; r < 2; r++) dot(-16 + i * 8, -28 + r * 7, 2, blinkC(T, i + r * 2, ['#e63946', '#ffd23f', '#7cff4f', '#1b1f27']));
+}
+function drawShuttle(e, t) {
+  const T = t + e.phase, f = 1 + .15 * Math.sin(T * 20);
+  limb(-60, -30, -72, 0, 4, '#6b7280'); limb(50, -30, 62, 0, 4, '#6b7280'); rr(-82, -4, 20, 4, 1, '#3b3f47'); rr(52, -4, 20, 4, 1, '#3b3f47');
+  ell(-130, -58, 20 * f, 9, 'rgba(0,229,255,.55)'); ell(-124, -58, 10 * f, 5, '#e0ffff');
+  rr(-126, -72, 26, 28, 6, '#6b7280');
+  poly([-64, -86, -24, -86, -54, -120, -84, -120], '#d9dee6');
+  g.beginPath(); g.moveTo(-112, -40); g.quadraticCurveTo(-118, -90, -40, -92); g.lineTo(60, -86); g.quadraticCurveTo(130, -70, 120, -46); g.quadraticCurveTo(110, -28, 60, -26); g.lineTo(-92, -26); g.closePath(); fs('#eef1f5');
+  rr(-92, -58, 172, 6, 2, '#e63946');
+  ell(80, -70, 26, 12, 'rgba(120,200,255,.9)'); ell(72, -74, 10, 4, 'rgba(255,255,255,.7)');
+  rr(-20, -74, 26, 38, 4, '#cfd6de'); line(-7, -74, -7, -36, '#9aa0a6', 1);
+  label('796', -54, -72, 13, '#1d3557');
+  for (let i = 0; i < 4; i++) dot(-80 + i * 40, -31, 2.5, blinkC(T, i, ['#7cff4f', '#e63946']));
+}
+function drawSlug(e, t) {
+  const T = t + e.phase, k = 1 + .12 * Math.sin(T * 3);
+  ell(-22, -1, 16, 2, 'rgba(179,136,255,.35)');
+  ell(0, -7, 18 * k, 7 / k, '#b388ff'); ell(16 * k, -9, 7, 6, '#b388ff');
+  line(18 * k, -14, 16 * k, -24, OUT, 1.3); line(22 * k, -14, 24 * k, -23, OUT, 1.3);
+  circle(16 * k, -25, 2.5, '#fff'); circle(24 * k, -24, 2.5, '#fff'); dot(16 * k, -25, 1.2, OUT); dot(24 * k, -24, 1.2, OUT);
+  for (let i = 0; i < 3; i++) dot(-10 + i * 7, -9, 1.8, '#7c4dff');
+}
+DRAW.robot = { draw: drawRobot, box: e => e.o.kind === 'droid' ? [-16, -48, 16, 0] : e.o.kind === 'cleaner' ? [-36, e.o.cat ? -62 : -16, 36, 0] : [-38, -96, 42, 0] };
+DRAW.drone = { draw: drawDrone, box: [-40, -30, 40, 24] };
+DRAW.ufo = { draw: drawUfo, box: [-46, -140, 46, 0] };
+DRAW.teleport = { draw: drawTeleport, box: [-44, -160, 44, 0] };
+DRAW.holoStage = { draw: drawHoloStage, box: [-44, -180, 44, 0] };
+DRAW.holoTable = { draw: drawHoloTable, box: [-32, -92, 32, 0] };
+DRAW.vending = { draw: drawVending, box: [-26, -120, 26, 0] };
+DRAW.arcade = { draw: drawArcade, box: [-28, -136, 28, 0] };
+DRAW.cryoPod = { draw: drawCryo, box: [-24, -114, 24, 0] };
+DRAW.console = { draw: drawConsole, box: [-32, -82, 32, 0] };
+DRAW.shuttle = { draw: drawShuttle, box: [-152, -122, 132, 0] };
+DRAW.slug = { draw: drawSlug, box: [-38, -28, 30, 0] };
+DRAW.crateSci = { draw: e => { rr(-24, -40, 48, 40, 3, '#6b7280'); g.save(); g.beginPath(); g.rect(-24, -18, 48, 8); g.clip(); for (let x = -30; x < 30; x += 8) poly([x, -10, x + 4, -10, x + 12, -18, x + 8, -18], '#ffd23f'); g.restore(); rr(-24, -18, 48, 8, 0, null); label('796', 0, -29, 9, '#e6e9ee'); }, box: [-26, -42, 26, 0] };
+DRAW.alienPlant = { draw: (e, t) => { const T = t + e.phase; for (let i = 0; i < 4; i++) { const sw = Math.sin(T * 1.5 + i) * 6, tx = -14 + i * 9 + sw, ty = -46 - (i % 2) * 12; tube(0, -16, -10 + i * 7, -34, tx, ty, 3, '#2e9e6f'); circle(tx, ty, 4.5, NEON[(i + e.id) % 4]); } rr(-12, -16, 24, 16, 3, '#3b4252'); }, box: [-24, -64, 24, 0] };
+
+// --- новые магазины станции (неоновые прилавки)
+Object.assign(STALLS, {
+  coffee: { sign: 'КОФЕ', awn: '#00e5ff', cry: ['Кофе на орбите!'], seller: { apron: '#1b1f27' }, station: true },
+  parts: { sign: 'ЗАПЧАСТИ', awn: '#ffd23f', cry: ['Болты! Гайки!'], seller: { hat: 'cap', hatC: '#34495e' }, station: true },
+  noodles: { sign: 'ЛАПША', awn: '#ff2bd6', cry: ['Горячая лапша!'], seller: { hat: 'bandana', hatC: '#e63946' }, station: true },
+  gadgets: { sign: 'ГАДЖЕТЫ', awn: '#7cff4f', cry: ['Новинка 2175!'], seller: { glasses: true }, station: true },
+  flora: { sign: 'ФЛОРА', awn: '#b388ff', cry: ['Цветы с Марса!'], seller: { dress: true }, station: true },
+});
+
+// --- цели станции
+const s796 = y => depthScale(y);
+TARGET_POOL.push(
+  { key: 'goldRobot', name: 'Золотой робот', th: ['station'], w: 110, d: 30, build: (x, y) => { const r = ent('robot', x, y, { kind: 'box', color: '#ffd21f', say: 'Бип-буп!' }, { anim: 'wave', flip: 1 }); P(x + 52 * s796(y), y, { bubble: 'Блестит!' }, 'wave', -1); return r; } },
+  { key: 'catRoomba', name: 'Кот на роботе-пылесосе', th: ['station'], w: 90, d: 25, build: (x, y) => ent('robot', x, y, { kind: 'cleaner', color: '#dfe3ea', cat: pick(CATC) }, { flip: 1 }) },
+  { key: 'pizzaDrone', name: 'Дрон с пиццей', th: ['station'], w: 90, d: 30, build: (x, y) => { const d = ent('drone', x, y, { cargo: 'pizza' }, { z: 125, flip: 1 }); P(x - 24 * s796(y), y - .5, { bubble: 'Моя пицца!' }, 'pointUp', 1); return d; } },
+  { key: 'threeEyed', name: 'Трёхглазый пришелец', th: ['station'], w: 110, d: 30, build: (x, y) => { const a = P(x, y, { alien: true, eyes: 3, skin: pick(ALIENC), dress: false, bubble: 'Привет, землянин!' }, 'shake', 1); P(x + 82 * s796(y), y, {}, 'shake', -1).phase = a.phase; return a; } },
+  { key: 'orangeSuit', name: 'Космонавт в оранжевом скафандре', th: ['station'], w: 90, d: 30, build: (x, y) => { const a = P(x, y, { suit: true, suitC: '#ff8c1a', dress: false }, 'wave', 1); ent('robot', x + 40 * s796(y), y + 1, { kind: 'droid', color: pick(ROBOTC), say: 'Бип!' }, { flip: -1 }); return a; } },
+  { key: 'teleporting', name: 'Человек в телепорте', th: ['station'], w: 150, d: 30, build: (x, y) => { const tp = ent('teleport', x, y - 1, { active: true }, { flip: 1 }); tp.snd = { k: 'zap', per: 4 }; const p = P(x, y, { tele: true, dress: false }, 'idle', 1); p.iconWith = [tp]; P(x + 66 * s796(y), y + 1, { bubble: 'Держись!' }, 'point', -1); return p; } },
+  { key: 'robodog', name: 'Робопёс', th: ['station'], w: 130, d: 30, build: (x, y) => { const d = ent('dog', x + 30 * s796(y), y, { robot: true, color: '#aeb8c2', pose: 'wag', say: 'Гав-бип!' }, { flip: -1 }); P(x - 36 * s796(y), y, { kid: true, beard: false, held: 'ball', ballC: '#00e5ff' }, 'play', 1); return d; } },
+  { key: 'ufo', name: 'Летающая тарелка', th: ['station'], w: 110, d: 30, build: (x, y) => { const u = ent('ufo', x, y, { cargo: true }, { flip: 1 }); u.snd = { k: 'ufo', per: 4 }; P(x + 50 * s796(y), y + 1, { kid: true, beard: false, bubble: 'НЛО!' }, 'pointUp', -1); return u; } },
+  { key: 'cryoAlien', name: 'Пришелец в криокапсуле', th: ['station'], w: 110, d: 30, build: (x, y) => { const pod = ent('cryoPod', x, y, { alien: true }, { flip: 1 }); P(x + 44 * s796(y), y + 1, { glasses: true, shirt: '#f4f4f4', bubble: 'Не будить!' }, 'point', -1); return pod; } },
+  {
+    key: 'holoSinger', name: 'Голограмма певицы', th: ['station'], w: 190, d: 30, build: (x, y) => {
+      const s = s796(y);
+      const h = ent('holoStage', x, y, { fig: mkPerson({ dress: true, shirt: '#00e5ff', skin: '#bff9ff', hair: 'long', hairC: '#00b8d4', hat: 'none', glasses: false, fat: false, kid: false }) }, { anim: 'dance', flip: 1 });
+      P(x - 56 * s, y + 3, { alien: true, eyes: 1 }, 'dance', 1); P(x + 56 * s, y + 3, {}, 'wave', -1);
+      return h;
+    }
+  },
+  { key: 'slug', name: 'Слизень-питомец', th: ['station'], w: 130, d: 25, build: (x, y) => { const s = s796(y); const sl = ent('slug', x + 34 * s, y + 1, {}, { flip: 1 }); const o = P(x - 34 * s, y, { alien: true, eyes: 2, held: 'leash' }, 'hold', 1); o.o.leash = toLocal(o, sl.x + 18 * sl.s, sl.y - 9 * sl.s); return sl; } },
+);
+// общие цели, которые подходят и станции
+for (const k of ['catRedHat', 'goldKey', 'mouseCheese', 'sleepingDog', 'juggler', 'purpleLamp', 'fishbowl', 'greenTopHat', 'lute']) { const d = TARGET_POOL.find(d => d.key === k); d.th = d.th.concat('station'); }
+
+// --- сценки станции
+GROUPS.push(
+  { th: ['station'], wgt: 6, w: 110, d: 30, build: (x, y) => { const s = s796(y); ent('robot', x - 28 * s, y, { kind: 'box', color: pick(ROBOTC), say: pick(['Бип-буп!', 'Принято!', 'Ошибка 796!']) }, { anim: pick(['idle', 'point', 'shake']), flip: 1 }); P(x + 30 * s, y, { bubble: chat() }, pick(['nod', 'argue', 'shake']), -1); } },
+  { th: ['station'], wgt: 4, w: 120, d: 30, build: (x, y) => { const s = s796(y); P(x - 30 * s, y, { alien: true, eyes: pick([1, 2]), held: 'camera' }, 'point', 1); P(x + 30 * s, y, { alien: true, eyes: pick([1, 2]), bubble: 'Сыр!' }, 'wave', -1); } },
+  { th: ['station'], wgt: 3, w: 110, d: 30, build: (x, y) => { const s = s796(y); ent('robot', x + 26 * s, y, { kind: 'box', color: pick(ROBOTC), repair: true, say: 'Ай!' }, { anim: 'idle', flip: -1 }); const m = P(x - 30 * s, y, { held: 'wrench', hat: 'cap', hatC: '#34495e' }, 'hammer', 1); m.snd = { k: 'clang', per: 1, p: .5 }; } },
+  { th: ['station'], wgt: 3, w: 140, d: 30, build: (x, y) => { const s = s796(y); P(x - 40 * s, y, { kid: true, beard: false, hover: true, bubble: 'Быстрее!' }, 'chase', 1, { z: 14 }); P(x + 30 * s, y + 1, { kid: true, beard: false, hover: true, hoverC: '#ff2bd6' }, 'chase', 1, { z: 14 }); } },
+  { th: ['station'], wgt: 3, w: 90, d: 30, build: (x, y) => { const s = s796(y); ent('drone', x + 8 * s, y + .5, { cargo: 'box', color: pick(['#3b3f47', '#1d3557']) }, { z: 125 }); P(x - 16 * s, y, { bubble: 'Моя посылка!' }, 'pointUp', 1); } },
+  { th: ['station'], wgt: 3, w: 110, d: 30, build: (x, y) => { const s = s796(y); ent('vending', x, y - 2, {}, { flip: 1 }); P(x - 40 * s, y, { bubble: 'Застряла!' }, 'point', 1); ent('robot', x + 40 * s, y + 1, { kind: 'droid', color: pick(ROBOTC) }, { flip: -1 }); } },
+  { th: ['station'], wgt: 3, w: 120, d: 30, build: (x, y) => { const s = s796(y); ent('arcade', x, y - 2, { color: pick(['#6a4c93', '#1d3557', '#a4161a']) }, { flip: 1 }); P(x - 34 * s, y, { kid: chance(.5), beard: false }, 'pet', 1); P(x + 38 * s, y, { kid: true, beard: false, bubble: 'Рекорд!' }, 'jump', -1); } },
+  { th: ['station'], wgt: 3, w: 130, d: 30, build: (x, y) => { const s = s796(y); ent('holoTable', x, y, {}, { flip: 1 }); P(x - 44 * s, y, { alien: true, eyes: pick([1, 2]), bubble: 'Шах!' }, 'pet', 1); P(x + 44 * s, y, {}, 'pet', -1); } },
+  { th: ['station'], wgt: 3, w: 110, d: 25, build: (x, y) => { const s = s796(y); ent('robot', x + 20 * s, y, { kind: 'cleaner', color: pick(['#dfe3ea', '#3b3f47', '#e63946']) }, { flip: -1 }); ent('cat', x - 30 * s, y, { color: pick(CATC), pose: 'reach' }, { flip: 1 }); } },
+  { th: ['station'], wgt: 3, w: 110, d: 30, build: (x, y) => { const s = s796(y); const a = P(x - 28 * s, y, { suit: true, suitC: pick(SUITC), held: 'mug' }, 'toast', 1); a.snd = { k: 'clink', per: 3, off: .4 }; P(x + 28 * s, y, { suit: true, suitC: pick(SUITC), held: 'mug', helmet: false }, 'toast', -1).phase = a.phase; } },
+  { th: ['station'], wgt: 2, w: 90, d: 25, build: (x, y) => { const s = s796(y); ent('robot', x + 20 * s, y, { kind: 'droid', color: pick(ROBOTC), say: 'Бип!' }, { flip: -1 }); P(x - 20 * s, y, { kid: true, beard: false }, 'pet', 1); } },
+  { th: ['station'], wgt: 2, w: 110, d: 25, build: (x, y) => { const s = s796(y); ent('alienPlant', x + 20 * s, y, {}); P(x - 26 * s, y, { held: 'bucket', pourC: '#7cff4f' }, 'pour', 1); } },
+  { th: ['station'], wgt: 2, w: 130, d: 30, build: (x, y) => { const s = s796(y); ent('crateSci', x + 40 * s, y, {}); ent('robot', x - 20 * s, y, { kind: 'box', color: pick(ROBOTC), held: 'tray', trayItem: 'mugs' }, { anim: 'holdTray', flip: 1 }); P(x - 70 * s, y, { suit: true, suitC: pick(SUITC), bubble: 'Спасибо, робот!' }, 'receive', 1); } },
+);
+// большие зоны станции (как прилавки: за ними ничего не прячется)
+const MODULES = {
+  shuttle: { w: 300, build: (x, y) => { const s = s796(y); ent('shuttle', x, y, {}, { flip: pick([1, -1]) }); const m = P(x + 30 * s, y + 16, { held: 'wrench', hat: 'cap', hatC: '#ff9f1a', dress: false }, 'hammer', -1); m.snd = { k: 'clang', per: 1, p: .4 }; ent('crateSci', x - 120 * s, y + 10, {}); ent('robot', x - 80 * s, y + 14, { kind: 'droid', color: pick(ROBOTC), say: 'Бип!' }, { flip: 1 }); } },
+  teleportHub: { w: 290, build: (x, y) => { const s = s796(y); ent('teleport', x - 90 * s, y, { auto: true }, { flip: 1 }); ent('teleport', x + 10 * s, y, {}, { flip: 1 }); ent('console', x + 100 * s, y, {}, { flip: 1 }); P(x + 100 * s, y + 16, { bubble: 'Телепорт готов!' }, 'pet', -1); P(x + 10 * s, y + 18, { suit: true, suitC: pick(SUITC) }, 'nod', 1); } },
+  arcade: { w: 270, build: (x, y) => { const s = s796(y); for (let i = -1; i <= 1; i++) ent('arcade', x + i * 80 * s, y, { color: pick(['#6a4c93', '#1d3557', '#a4161a', '#2a9d8f']) }, { flip: 1 }); P(x - 80 * s, y + 18, { kid: true, beard: false }, 'pet', 1); P(x + 80 * s, y + 18, { bubble: 'Ещё раз!' }, 'jump', -1); } },
+  lab: { w: 290, build: (x, y) => { const s = s796(y); ent('cryoPod', x - 110 * s, y, {}); ent('cryoPod', x - 60 * s, y, {}); ent('console', x + 20 * s, y, {}, { flip: 1 }); P(x + 20 * s, y + 16, { glasses: true, shirt: '#f4f4f4', bubble: 'Эксперимент!' }, 'pet', 1); ent('robot', x + 100 * s, y + 10, { kind: 'box', color: pick(ROBOTC), held: 'tray', trayItem: 'mugs' }, { anim: 'holdTray', flip: -1 }); } },
+  holo: { w: 220, build: (x, y) => { const s = s796(y); ent('holoTable', x, y, {}, { flip: 1 }); ent('vending', x + 80 * s, y - 2, {}, { flip: 1 }); P(x - 50 * s, y + 10, { alien: true, eyes: 1 }, 'pet', 1); P(x + 30 * s, y + 16, {}, 'nod', -1); } },
+};
 
 /* ---------------- 8. Генерация сцены ---------------- */
 let entities = [];     // объекты сцены, которая сейчас строится
@@ -1551,7 +1876,7 @@ function autoSound(e) {
   if (e.snd) return;
   const o = e.o, say = { per: 8, off: 2 * o.seed };
   switch (e.type) {
-    case 'dog': if (o.say) e.snd = { k: 'bark', ...say }; break;
+    case 'dog': if (o.say) e.snd = { k: o.robot ? 'beep' : 'bark', ...say }; break;
     case 'cat': if (o.say) e.snd = { k: o.say === 'Шшш!' ? 'hiss' : 'meow', ...say }; break;
     case 'chicken': e.snd = o.rooster ? { k: 'crow', ...say } : { k: 'cluck', per: 1.6, p: .25 }; break;
     case 'pigeon': e.snd = o.gull ? (o.say ? { k: 'gull', ...say } : { k: 'gull', per: 6, p: .3 }) : o.fly ? { k: 'coo', per: 4 } : null; break;
@@ -1559,6 +1884,10 @@ function autoSound(e) {
     case 'pig': e.snd = { k: 'oink', per: 5, p: .5 }; break;
     case 'goat': e.snd = { k: 'bleat', per: 7, p: .5 }; break;
     case 'horse': e.snd = { k: 'neigh', per: 11, p: .5 }; break;
+    case 'robot': e.snd = o.say ? { k: 'beep', ...say } : { k: o.kind === 'cleaner' ? 'whirr' : 'beep', per: 6, p: .4 }; break;
+    case 'drone': e.snd = { k: 'whirr', per: 4, p: .4 }; break;
+    case 'teleport': if (o.auto) e.snd = { k: 'zap', per: 5 }; break;
+    case 'arcade': e.snd = { k: 'blip', per: .8, p: .35 }; break;
   }
 }
 function lightsOf(e) {
@@ -1570,9 +1899,21 @@ function lightsOf(e) {
     case 'brazier': at(0, -44, 220); break;
     case 'fortuneTable': at(0, -46, 140); break;
     case 'feastTable': at(-40, -86, 180); at(50, -86, 180); break;
-    case 'stall': if (e.o.lantern) at(-78, -126, 260); if (e.o.kind === 'lamps') at(0, -80, 230); break;
+    case 'stall': if (e.o.lantern) at(-78, -126, 260); if (e.o.kind === 'lamps') at(0, -80, 230); if (e.o.neon) at(0, -120, 280); break;
     case 'anvil': at(0, -40, 110); break;
-    case 'person': if (e.o.held === 'lamp') at(36, -30, 190); break;
+    case 'person': if (e.o.held === 'lamp') at(36, -30, 190); if (e.o.visor) at(0, -95, 60); if (e.o.hover) at(4, 4, 90); break;
+    case 'teleport': at(0, -60, e.o.active || e.o.auto ? 240 : 110); break;
+    case 'vending': at(0, -60, 190); break;
+    case 'arcade': at(0, -90, 170); break;
+    case 'console': at(0, -60, 150); break;
+    case 'holoStage': at(0, -70, 260); break;
+    case 'holoTable': at(0, -70, 180); break;
+    case 'cryoPod': at(0, -60, 160); break;
+    case 'shuttle': at(-128, -58, 200); at(80, -70, 120); break;
+    case 'ufo': at(0, -80, 230); break;
+    case 'alienPlant': at(0, -44, 110); break;
+    case 'robot': if (e.o.kind === 'box') at(0, -60, 90); break;
+    case 'drone': at(0, -12, 90); break;
   }
   return L;
 }
@@ -1582,7 +1923,7 @@ function buildScene(L, targetKeys) {
   entities = []; occ = []; nextId = 1; curTags = L.tags;
   const found = [];
   // --- стена (в зале и замке): полки на колоннах и подоконники
-  if (L.bg !== 'port') {
+  if (L.bg === 'hall' || L.bg === 'castle') {
     const wallSlots = shuffle(PILLARS.map(px => ({ x: px, y: 350 })).concat(WINDOWS.map(w => ({ x: w.x + rnd(-40, 40), y: 266, sill: true }))));
     for (const d of TARGET_POOL.filter(d => d.wall && hasTag(d.th))) {
       const sl = wallSlots.find(s => !s.sill && !s.used); sl.used = true;
@@ -1609,7 +1950,12 @@ function buildScene(L, targetKeys) {
       if (chance(.7)) ent('dog', p.x + rnd(-120, 120) * p.s, p.y + 18 * p.s, { color: pick(DOGC), pose: 'sit', say: 'Гав!' }, { flip: chance(.5) ? 1 : -1 });
     }
   } else {
-    const pool = L.tags.includes('port') ? ['fish', 'spices', 'fruit', 'pots', 'lamps', 'hats', 'candy', 'keys', 'bread'] : Object.keys(STALLS);
+    for (const m of L.modules || []) {
+      const M = MODULES[m], p = place(M.w, 25, { hard: true, back: 170, front: 30, tries: 400, yMin: 620 });
+      if (p) M.build(p.x, p.y);
+    }
+    const station = L.tags.includes('station');
+    const pool = L.tags.includes('port') ? ['fish', 'spices', 'fruit', 'pots', 'lamps', 'hats', 'candy', 'keys', 'bread'] : Object.keys(STALLS).filter(k => !!STALLS[k].station === station);
     const kinds = shuffle(pool.slice()).slice(0, L.stalls);
     for (const kind of kinds) {
       const p = place(230, 25, { hard: true, back: 160, front: 20, tries: 400, yMin: 600 });
@@ -1617,7 +1963,7 @@ function buildScene(L, targetKeys) {
       const S = STALLS[kind];
       const sel = P(p.x + rnd(-40, 40) * p.s, p.y - 10, { ...S.seller, bubble: S.cry }, pick(['shout', 'wave', 'give']));
       sel.s = p.s;
-      ent('stall', p.x, p.y, { kind, cloth: pick(['#fff1c1', '#e8f4ff', '#ffe0e6', '#e6ffe8']), lantern: !!L.night }, { flip: 1 });
+      ent('stall', p.x, p.y, { kind, cloth: pick(['#fff1c1', '#e8f4ff', '#ffe0e6', '#e6ffe8']), lantern: !!L.night, neon: station }, { flip: 1 });
       const nb = irnd(1, 2);
       for (let k = 0; k < nb; k++) P(p.x + (k ? 60 : -60) * p.s + rnd(-15, 15) * p.s, p.y + 24 * p.s, { held: pick([null, 'basket', 'bread', 'fish']), bubble: chance(.5) ? ['Почём?', 'Беру!', 'Дайте два!', 'Скидку!'][irnd(0, 3)] : null }, pick(['point', 'receive', 'nod']), k ? -1 : 1);
     }
@@ -1653,7 +1999,7 @@ const PILLARS = [], WINDOWS = [];
 for (let x = 90; x < W; x += 282) PILLARS.push(x);
 for (let i = 0; i < PILLARS.length - 1; i++) WINDOWS.push({ x: (PILLARS[i] + PILLARS[i + 1]) / 2 });
 const HANG = WINDOWS.map((w, i) => ({ x: w.x + (i % 2 ? 90 : -90) }));   // подвесные фонари / люстры
-let floorA, floorB, floorGrout, wallStones, plankAlt, plankSeams;
+let floorA, floorB, floorGrout, wallStones, plankAlt, plankSeams, floorRows = [];
 const motes = Array.from({ length: 90 }, () => ({ x: rnd(W), y: rnd(150, H), r: rnd(1, 2.6), sp: rnd(.2, .6), ph: rnd(10) }));
 const straws = Array.from({ length: 320 }, () => ({ x: rnd(W), y: rnd(FLOOR_Y + 20, H), a: rnd(TAU), l: rnd(4, 9) }));
 const stars = Array.from({ length: 120 }, () => ({ x: rnd(W), y: rnd(90, 270), r: rnd(.6, 1.8), ph: rnd(10) }));
@@ -1662,6 +2008,7 @@ function buildBackground() {
   const vp = { x: W / 2, y: -1300 };
   const rows = []; let y = FLOOR_Y;
   while (y < H + 60) { rows.push(y); y += 34 + (y - FLOOR_Y) * .045; }
+  floorRows = rows;
   floorA = new Path2D(); floorB = new Path2D(); floorGrout = new Path2D(); plankAlt = new Path2D(); plankSeams = new Path2D();
   const colX = []; for (let x = -1600; x <= W + 1600; x += 120) colX.push(x);
   const px = (x0, yy) => vp.x + (x0 - vp.x) * (yy - vp.y) / (H - vp.y);
@@ -1691,10 +2038,12 @@ function buildBackground() {
 // источники света фона — для ночного уровня
 function bgLights(L) {
   if (L.bg === 'port') return [];
+  if (L.bg === 'station') return SIGNS.map(sg => ({ x: sg.x, y: 330, r: 240 })).concat(PORTS.map(w => ({ x: w.x + w.w / 2, y: 190, r: 260 })));
   return HANG.map(h => ({ x: h.x, y: 142, r: 230 })).concat(L.bg === 'castle' ? PILLARS.map(x => ({ x, y: 196, r: 200 })) : []);
 }
 function drawBackground(L, t, vr) {
-  if (L.bg === 'port') drawPortBg(t, vr);
+  if (L.bg === 'station') drawStationBg(t, vr);
+  else if (L.bg === 'port') drawPortBg(t, vr);
   else drawHallBg(t, vr, L.bg === 'castle', !!L.night);
 }
 function windowPath(w) { const x0 = w.x - 70, y0 = 90; g.beginPath(); g.moveTo(x0, 270); g.lineTo(x0, y0 + 70); g.arc(w.x, y0 + 70, 70, Math.PI, 0); g.lineTo(x0 + 140, 270); g.closePath(); }
@@ -1854,6 +2203,78 @@ function drawPortBg(t, vr) {
   const sh = g.createLinearGradient(0, FLOOR_Y, 0, FLOOR_Y + 100); sh.addColorStop(0, 'rgba(40,20,10,.3)'); sh.addColorStop(1, 'rgba(40,20,10,0)');
   g.fillStyle = sh; g.fillRect(0, FLOOR_Y, W, 100);
 }
+// --- Этаж 796: иллюминаторы в космос, неон, металлический пол
+const PORTS = [], SIGNS = [];
+for (let x = 60; x + 360 < W; x += 600) PORTS.push({ x, w: 360 });
+['ЭТАЖ 796', 'КАФЕ «ОРБИТА»', 'ТЕЛЕПОРТ →', 'ДОК 3', 'ЛАБОРАТОРИЯ', '2175'].forEach((txt, i) => SIGNS.push({ x: 510 + i * 600, txt, c: NEON[i % 4] }));
+const spaceStars = Array.from({ length: 260 }, () => ({ x: rnd(W), y: rnd(70, 300), r: rnd(.5, 1.8), ph: rnd(10) }));
+function drawStationBg(t, vr) {
+  g.fillStyle = '#1b1f2a'; g.fillRect(0, 0, W, FLOOR_Y);
+  for (let x = 0; x < W; x += 150) {
+    if (x + 150 < vr.x0 || x > vr.x1) continue;
+    rr(x + 3, 38, 144, FLOOR_Y - 52, 4, '#262c3a');
+    for (const [dx, dy] of [[12, 50], [138, 50], [12, FLOOR_Y - 26], [138, FLOOR_Y - 26]]) dot(x + dx, dy, 2, '#4b5364');
+  }
+  // иллюминаторы
+  g.save(); g.beginPath();
+  for (const w of PORTS) { g.moveTo(w.x + 24, 70); g.arcTo(w.x + w.w, 70, w.x + w.w, 300, 24); g.arcTo(w.x + w.w, 300, w.x, 300, 24); g.arcTo(w.x, 300, w.x, 70, 24); g.arcTo(w.x, 70, w.x + w.w, 70, 24); g.closePath(); }
+  g.clip();
+  const sp = g.createLinearGradient(0, 70, 0, 300); sp.addColorStop(0, '#05060f'); sp.addColorStop(1, '#141a3a'); g.fillStyle = sp; g.fillRect(0, 70, W, 230);
+  for (const st of spaceStars) if (st.x > vr.x0 - 10 && st.x < vr.x1 + 10) dot(st.x, st.y, st.r, `rgba(255,255,255,${.45 + .45 * Math.sin(t * 1.5 + st.ph)})`);
+  // планеты
+  const pl = (x, y, r, c1, c2, ring) => {
+    const gr = g.createRadialGradient(x - r * .4, y - r * .4, r * .1, x, y, r); gr.addColorStop(0, c1); gr.addColorStop(1, c2);
+    if (ring) { g.beginPath(); g.ellipse(x, y, r * 1.9, r * .45, -.25, Math.PI, TAU); g.strokeStyle = 'rgba(240,210,160,.8)'; g.lineWidth = 6; g.stroke(); }
+    g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    if (ring) { g.beginPath(); g.ellipse(x, y, r * 1.9, r * .45, -.25, 0, Math.PI); g.strokeStyle = 'rgba(240,210,160,.8)'; g.lineWidth = 6; g.stroke(); }
+  };
+  pl(PORTS[1].x + 250, 190, 70, '#f6c67a', '#a0522d', true);
+  pl(PORTS[3].x + 120, 230, 90, '#8fd3ff', '#1d4e89', false);
+  dot(PORTS[3].x + 100, 205, 26, 'rgba(90,190,110,.8)'); dot(PORTS[3].x + 150, 250, 20, 'rgba(90,190,110,.8)');
+  pl(PORTS[4].x + 280, 120, 26, '#e0e0e0', '#7a7a7a', false);
+  // пролетающие корабли
+  for (let i = 0; i < 5; i++) {
+    const x = ((t * (40 + i * 18) + i * 900) % (W + 400)) - 200, y = 110 + i * 38;
+    g.save(); g.translate(x, y); if (i % 2) g.scale(-1, 1);
+    poly([-22, 0, 16, -5, 24, 0, 16, 5], ['#cfd6de', '#e9a23b', '#9aa7b8'][i % 3]); ell(-26, 0, 7, 2.5, NEON[i % 4]);
+    g.restore();
+  }
+  g.restore();
+  for (const w of PORTS) { rr(w.x, 70, w.w, 230, 24, null); g.lineWidth = 8; g.strokeStyle = '#4b5364'; g.stroke(); line(w.x + w.w / 2, 72, w.x + w.w / 2, 298, '#4b5364', 5); }
+  // трубы и огоньки
+  rr(-10, 16, W + 20, 14, 6, '#4b5364'); rr(-10, 34, W + 20, 8, 4, '#3b4252');
+  for (let x = 40; x < W; x += 80) { if (x < vr.x0 || x > vr.x1) continue; rr(x - 5, 14, 10, 18, 2, '#6b7280'); dot(x + 40, 38, 2.2, (Math.floor(t * 2) + x / 80) % 4 < 1 ? '#7cff4f' : '#1b1f27'); }
+  // неоновые вывески
+  for (const sg of SIGNS) {
+    if (sg.x < vr.x0 - 200 || sg.x > vr.x1 + 200) continue;
+    const off = Math.sin(t * 17 + sg.x) > .985;
+    rr(sg.x - 110, 318, 220, 48, 8, '#11141c');
+    g.globalAlpha = off ? .15 : .35; label(sg.txt, sg.x, 343, 26, sg.c);
+    g.globalAlpha = off ? .3 : 1; label(sg.txt, sg.x, 342, 22, sg.c); g.globalAlpha = 1;
+  }
+  // полоса «опасно» у стены
+  rr(-10, FLOOR_Y - 26, W + 20, 26, 0, '#1b1f27');
+  g.save(); g.beginPath(); g.rect(0, FLOOR_Y - 22, W, 18); g.clip();
+  g.fillStyle = '#ffd23f'; g.beginPath();
+  for (let x = Math.floor(vr.x0 / 30) * 30 - 30; x < vr.x1 + 30; x += 30) { g.moveTo(x, FLOOR_Y - 4); g.lineTo(x + 15, FLOOR_Y - 4); g.lineTo(x + 33, FLOOR_Y - 22); g.lineTo(x + 18, FLOOR_Y - 22); g.closePath(); }
+  g.fill(); g.restore();
+  // металлический пол
+  g.fillStyle = '#4b5260'; g.fillRect(0, FLOOR_Y, W, H - FLOOR_Y);
+  g.fillStyle = '#434957'; g.fill(floorA);
+  g.fillStyle = '#555c6b'; g.fill(floorB);
+  g.strokeStyle = 'rgba(20,24,32,.55)'; g.lineWidth = 2.5; g.stroke(floorGrout);
+  // бегущие световые дорожки
+  g.save(); g.setLineDash([60, 40]); g.lineDashOffset = -t * 120;
+  for (const k of [3, 9, 16]) {
+    const y = floorRows[k]; if (!y || y < vr.y0 - 10 || y > vr.y1 + 10) continue;
+    g.strokeStyle = 'rgba(0,229,255,.25)'; g.lineWidth = 9; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+    g.strokeStyle = '#00e5ff'; g.lineWidth = 3; g.stroke();
+  }
+  g.restore();
+  g.globalAlpha = .12; label('796', W / 2, H - 170, 260, '#00e5ff'); g.globalAlpha = 1;
+  const sh = g.createLinearGradient(0, FLOOR_Y, 0, FLOOR_Y + 110); sh.addColorStop(0, 'rgba(0,0,0,.35)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = sh; g.fillRect(0, FLOOR_Y, W, 110);
+}
 function drawMotes(t, vr) {
   for (const m of motes) {
     const x = m.x + Math.sin(t * m.sp + m.ph) * 20, y = m.y + Math.cos(t * m.sp * .7 + m.ph) * 14;
@@ -2011,7 +2432,7 @@ const Sound = {
   play(k, v = 1) {
     if (!this.ctx || !this.on) return;
     const now = performance.now();
-    if (now - (this.last[k] || 0) < 160 || (k !== 'ui' && now - this.lastAny < 45)) return;
+    if (now - (this.last[k] || 0) < 260 || (k !== 'ui' && k !== 'found' && k !== 'miss' && now - this.lastAny < 90)) return;
     this.last[k] = now; this.lastAny = now;
     const T = (f, d, o) => this.tone(f, d, o), N = (d, o) => this.noise(d, o);
     switch (k) {
@@ -2038,6 +2459,11 @@ const Sound = {
       case 'drum': T(110, .22, { to: 55, vol: .2 * v }); N(.06, { filter: 'lowpass', ff: 800, vol: .08 * v }); break;
       case 'clink': T(2200, .3, { vol: .05 * v }); T(3300, .25, { vol: .03 * v }); break;
       case 'snap': N(.03, { filter: 'highpass', ff: 2000, vol: .08 * v }); break;
+      case 'beep': T(1400, .07, { type: 'square', vol: .035 * v, filter: 'lowpass', ff: 3000 }); T(1900, .07, { type: 'square', vol: .035 * v, filter: 'lowpass', ff: 3000, when: .09 }); T(1200, .09, { type: 'square', vol: .03 * v, filter: 'lowpass', ff: 3000, when: .18 }); break;
+      case 'zap': T(180, .45, { type: 'sawtooth', to: 1800, vol: .06 * v, filter: 'bandpass', ff: 1200, q: 2 }); N(.4, { ff: 800, to: 6000, q: 3, vol: .05 * v }); break;
+      case 'whirr': N(.6, { ff: 900, q: 6, vol: .04 * v }); T(220, .6, { type: 'sawtooth', vol: .015 * v, vib: 30, vibAmt: 20, filter: 'lowpass', ff: 700 }); break;
+      case 'blip': T(pick([660, 880, 990, 1320]), .07, { type: 'square', vol: .03 * v }); break;
+      case 'ufo': T(600, 1.2, { type: 'sine', vol: .06 * v, vib: 6, vibAmt: 200 }); break;
     }
   },
   // фоновый звук локации: гул толпы, прибой, треск огня, сверчки
@@ -2049,12 +2475,17 @@ const Sound = {
     const nodes = [];
     const loop = (type, f, q, vol) => { const src = c.createBufferSource(); src.buffer = this.noiseBuf; src.loop = true; const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.value = f; fl.Q.value = q; const gn = c.createGain(); gn.gain.value = vol; src.connect(fl); fl.connect(gn); gn.connect(bus); src.start(); nodes.push(src); return gn; };
     const lfo = (param, rate, amt) => { const o = c.createOscillator(), a = c.createGain(); o.frequency.value = rate; a.gain.value = amt; o.connect(a); a.connect(param); o.start(); nodes.push(o); };
-    const port = L.bg === 'port', castle = L.bg === 'castle', night = !!L.night;
-    if (port) { const w = loop('lowpass', 420, .7, .1); lfo(w.gain, .11, .07); loop('bandpass', 700, .6, .012); }
+    const port = L.bg === 'port', castle = L.bg === 'castle', night = !!L.night, station = L.bg === 'station';
+    if (station) {
+      loop('lowpass', 140, .8, .12);
+      const hum = c.createOscillator(), hg = c.createGain(); hum.frequency.value = 55; hg.gain.value = .02; hum.connect(hg); hg.connect(bus); hum.start(); nodes.push(hum);
+      lfo(hg.gain, .08, .01); loop('bandpass', 900, .8, .01);
+    } else if (port) { const w = loop('lowpass', 420, .7, .1); lfo(w.gain, .11, .07); loop('bandpass', 700, .6, .012); }
     else { const m = loop('bandpass', castle ? 520 : 760, .8, night ? .01 : .024); lfo(m.gain, .21, .007); }
     const timer = setInterval(() => {
       if (!this.on || document.hidden) return;
       const r = Math.random();
+      if (station) { if (r < .18) this.tone(rnd(1100, 2600), .05, { type: 'square', vol: .006, filter: 'lowpass', ff: 3500, dest: bus }); if (r < .05) this.noise(.9, { ff: 300, to: 1500, q: 1, vol: .015, dest: bus }); return; }
       if (!night || r < .3) this.tone(rnd(150, 320), rnd(.08, .22), { type: 'sawtooth', filter: 'bandpass', ff: rnd(500, 1400), q: 8, vol: night ? .006 : .012, dest: bus });
       if (night && r < .55) for (let k = 0; k < 3; k++) this.tone(4600, .03, { vol: .018, when: k * .06, dest: bus });
       if (castle && r < .3) this.noise(.02, { filter: 'highpass', ff: 2500, vol: .03, dest: bus });
@@ -2250,17 +2681,19 @@ function hideOverlays() { document.getElementById('menu').classList.add('hidden'
 const thumbs = {};
 function renderThumb(L) {
   const cv = document.createElement('canvas'); cv.width = 480; cv.height = 270;
-  const c = cv.getContext('2d');
+  const px = L.pixel ? 2 : 1, lo = document.createElement('canvas'); lo.width = cv.width / px; lo.height = cv.height / px;
+  const c = lo.getContext('2d'); c.scale(1 / px, 1 / px);
   const sc = buildScene(L, []);
   const k = Math.min(cv.width / W, cv.height / H * 1.35), vr = { x0: 0, y0: 0, x1: W, y1: H };
   c.fillStyle = '#3a2618'; c.fillRect(0, 0, cv.width, cv.height);
   c.save(); c.translate((cv.width - W * k) / 2, 0); c.scale(k, k); c.translate(0, -H * .12);
-  drawWorld(c, sc, 1, vr, k);
+  NOBUBBLE_ALL = true; drawWorld(c, sc, 1, vr, k);
   c.restore();
-  if (L.night) {
+  const out = cv.getContext('2d'); out.imageSmoothingEnabled = !L.pixel; out.drawImage(lo, 0, 0, cv.width, cv.height);
+  if (L.dark) {
     const dk = document.createElement('canvas'); dk.width = cv.width; dk.height = cv.height;
     darkness(dk.getContext('2d'), sc, (x, y) => [(cv.width - W * k) / 2 + x * k, (y - H * .12) * k], k, null);
-    c.drawImage(dk, 0, 0);
+    out.drawImage(dk, 0, 0);
   }
   return cv;
 }
@@ -2272,10 +2705,10 @@ function openMenu() {
   const best = loadBest();
   LEVELS.forEach((L, i) => {
     const card = document.createElement('div');
-    card.className = 'lvl'; card.tabIndex = 0; card.setAttribute('role', 'button');
+    card.className = L.pixel ? 'lvl wide' : 'lvl'; card.tabIndex = 0; card.setAttribute('role', 'button');
     card.setAttribute('aria-label', `Уровень ${i + 1}: ${L.name}`);
     const b = best[L.id];
-    card.innerHTML = `<div class="thumb"></div><div class="lvl-head"><span class="num">${i + 1}</span><h3>${L.name}</h3></div><p>${L.desc}</p>
+    card.innerHTML = `<div class="thumb"></div><div class="lvl-head"><span class="num">${i + 1}</span><h3>${L.name}</h3>${L.pixel ? '<span class="badge">НОВЫЙ</span>' : ''}</div><p>${L.desc}</p>
       <div class="meta"><span>🎯 ${L.targets} целей</span><span>${b ? `🏆 ${fmt(b.time)} · <b class="st">${'★'.repeat(b.stars)}${'☆'.repeat(3 - b.stars)}</b>` : 'ещё не пройден'}</span></div>`;
     const slot = card.querySelector('.thumb');
     if (thumbs[L.id]) slot.appendChild(thumbs[L.id]);
@@ -2305,7 +2738,8 @@ document.getElementById('nextBtn').onclick = () => { Sound.play('ui'); newGame(g
 document.getElementById('menuBtn').onclick = () => { Sound.play('ui'); game.started = false; openMenu(); };
 
 /* ---------------- 14. Отрисовка и главный цикл ---------------- */
-let NOBUBBLE = false;
+let NOBUBBLE = false, NOBUBBLE_ALL = false;
+const PIX = 2.5;          // размер «пикселя» уровня Этаж 796 в CSS-пикселях
 function drawWorld(c, sc, t, vr, px) {
   g = c;
   drawBackground(sc.level, t, vr);
@@ -2318,7 +2752,7 @@ function drawWorld(c, sc, t, vr, px) {
     g.save();
     g.translate(e.x, e.y - (e.z || 0) * e.s);
     g.scale(e.s * e.flip, e.s);
-    FLIP = e.flip; NOBUBBLE = e.s * px < .32;
+    FLIP = e.flip; NOBUBBLE = NOBUBBLE_ALL || e.s * px < .32;
     if (e.found) {
       const pulse = .6 + .4 * Math.sin(t * 4);
       g.shadowColor = `rgba(255,215,40,${.9 * pulse + .1})`; g.shadowBlur = 22 * view.dpr * Math.min(2, px);
@@ -2328,7 +2762,7 @@ function drawWorld(c, sc, t, vr, px) {
     if (e.o.say && e.type !== 'person' && !NOBUBBLE && (((t + e.phase) * .5 + e.o.seed) % 4) < 1.6) bubble(e.o.say, 8, boxOf(e)[1] - 12, 10);
     g.restore();
   }
-  FLIP = 1; NOBUBBLE = false;
+  FLIP = 1; NOBUBBLE = NOBUBBLE_ALL = false;
   if (sc.level.bg === 'hall' && !sc.level.night) drawMotes(t, vr);
 }
 // темнота ночного уровня: светят фонари, найденные цели, подсказка и фонарик у курсора
@@ -2338,7 +2772,7 @@ function darkness(dc, sc, toScreen, px, extra) {
   const w = dc.canvas.width, h = dc.canvas.height;
   dc.setTransform(1, 0, 0, 1, 0, 0);
   dc.globalCompositeOperation = 'source-over'; dc.clearRect(0, 0, w, h);
-  dc.fillStyle = 'rgba(6,10,38,.78)'; dc.fillRect(0, 0, w, h);
+  dc.fillStyle = sc.level.bg === 'station' ? `rgba(8,6,30,${sc.level.dark})` : `rgba(6,10,38,${sc.level.dark})`; dc.fillRect(0, 0, w, h);
   dc.globalCompositeOperation = 'destination-out';
   const hole = (x, y, r, a = 1) => {
     if (x < -r || y < -r || x > w + r || y > h + r) return;
@@ -2357,28 +2791,30 @@ function render(t, now) {
   if (!scene) return;
   const vr = { x0: cam.x, y0: cam.y, x1: cam.x + view.w / s, y1: cam.y + view.h / s };
   // сильно отдалено: сотни мелких фигурок перерисовываем ~9 раз в секунду (и сразу при движении камеры)
-  const far = s < normScale() * .7;
-  const key = `${cam.x.toFixed(1)},${cam.y.toFixed(1)},${s.toFixed(4)},${canvas.width},${canvas.height},${game.found}`;
+  const far = s < normScale() * .7, pixel = !!scene.level.pixel, off = far || pixel;
+  const k = pixel ? 1 / PIX : d, cw = pixel ? Math.ceil(view.w / PIX) : canvas.width, chh = pixel ? Math.ceil(view.h / PIX) : canvas.height;
+  const key = `${cam.x.toFixed(1)},${cam.y.toFixed(1)},${s.toFixed(4)},${cw},${chh},${game.found}`;
   if (!far || key !== worldCache.key || now - worldCache.t > worldCache.every) {
     let c = ctx;
-    if (far) {
+    if (off) {
       if (!worldCache.cv) worldCache.cv = document.createElement('canvas');
-      if (worldCache.cv.width !== canvas.width || worldCache.cv.height !== canvas.height) { worldCache.cv.width = canvas.width; worldCache.cv.height = canvas.height; }
-      c = worldCache.cv.getContext('2d'); c.setTransform(d, 0, 0, d, 0, 0); c.fillStyle = '#1e140c'; c.fillRect(0, 0, view.w, view.h);
+      if (worldCache.cv.width !== cw || worldCache.cv.height !== chh) { worldCache.cv.width = cw; worldCache.cv.height = chh; }
+      c = worldCache.cv.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.fillStyle = '#1e140c'; c.fillRect(0, 0, view.w, view.h);
       worldCache.key = key; worldCache.t = now;
     }
+    NOBUBBLE_ALL = pixel;
     const t0 = performance.now();
     c.save(); c.scale(s, s); c.translate(-cam.x, -cam.y);
     drawWorld(c, scene, t, vr, s);
     c.restore();
     if (far) worldCache.every = clamp((performance.now() - t0) * 4, 110, 700);
   }
-  if (far) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(worldCache.cv, 0, 0); ctx.setTransform(d, 0, 0, d, 0, 0); }
-  if (scene.level.night) {
+  if (off) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = !pixel; ctx.drawImage(worldCache.cv, 0, 0, canvas.width, canvas.height); ctx.imageSmoothingEnabled = true; ctx.setTransform(d, 0, 0, d, 0, 0); }
+  if (scene.level.dark) {
     if (!darkCv) darkCv = document.createElement('canvas');
     if (darkCv.width !== canvas.width || darkCv.height !== canvas.height) { darkCv.width = canvas.width; darkCv.height = canvas.height; }
     darkness(darkCv.getContext('2d'), scene, (x, y) => [(x - cam.x) * s * d, (y - cam.y) * s * d], s * d, hole => {
-      if (mouse.in) hole(mouse.x * d, mouse.y * d, 150 * d);
+      if (mouse.in && scene.level.night) hole(mouse.x * d, mouse.y * d, 150 * d);
       for (const e of game.targets) if (e.found) { const b = e.wb; hole(((b.x0 + b.x1) / 2 - cam.x) * s * d, ((b.y0 + b.y1) / 2 - cam.y) * s * d, Math.max(70, (b.y1 - b.y0) * .9) * s * d, .8); }
       if (game.hint) hole((game.hint.x - cam.x) * s * d, (game.hint.y - cam.y) * s * d, game.hint.r * 1.2 * s * d);
     });
