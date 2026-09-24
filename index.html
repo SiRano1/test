@@ -180,9 +180,9 @@ const CATC = ['#f39c12', '#7f8c8d', '#2d2d2d', '#f5f5f5', '#c97b3a', '#d9c4a0', 
 const CAT_HATC = ['#2d6cdf', '#3aa655', '#f2c230', '#8e44ad'];              // красной нет — это цель
 const DOGC = ['#c58b4b', '#8b5a2b', '#f0e0c0', '#2b2b2b', '#d9a066', '#a0a0a0'];
 const BALLC = ['#ff4d6d', '#ffd23f', '#3ec1d3', '#9d4edd', '#06d6a0', '#ff8c42'];
-const UMBC = ['#e63946', '#ffd166', '#2a9d8f', '#f77f00'];                    // синего нет — это цель
+const UMBC = ['#e63946', '#ffd166', '#f77f00', '#ff70a6'];                    // синего нет — это цель
 const LAMPC = ['#ffcc33', '#ff9933', '#8fd14f', '#ff6f59'];                   // фиолетового нет — это цель
-const KEYC = ['#cfd6de', '#8a8a8a', '#cd7f32'];                                // золотого нет — это цель
+const KEYC = ['#cfd6de', '#8a8a8a', '#5b6770'];                                // золотого нет — это цель
 const PARROTC = [['#e63946', '#1d6fe0'], ['#2ecc71', '#f1c40f'], ['#1d6fe0', '#f1c40f'], ['#ff8c1a', '#2ecc71']];
 
 /* ---------------- 2. Примитивы рисования ---------------- */
@@ -1019,7 +1019,7 @@ const TARGET_POOL = [
   {
     key: 'oldNewspaper', name: 'Старик с газетой', w: 70, d: 30, build: (x, y) => {
       const m = ent('person', x, y, mkPerson({ dress: false, hair: 'bald', hairC: '#cfcfcf', beard: true, beardC: '#e6e6e6', glasses: true, hat: 'none', fat: false, held: 'newspaper', shirt: '#6d7a8a' }), { anim: 'read' });
-      ent('pigeon', x + 6 * m.s, y + .5, { fly: true }, { z: 175, flip: -m.flip });
+      m.iconWith = [ent('pigeon', x + 6 * m.s, y + .5, { fly: true }, { z: 175, flip: -m.flip })];
       return m;
     }
   },
@@ -1027,14 +1027,14 @@ const TARGET_POOL = [
     key: 'cookCauldron', name: 'Повар у котла', w: 220, d: 30, build: (x, y) => {
       const s = depthScale(y);
       const cook = ent('person', x - 70 * s, y, mkPerson({ dress: false, hat: 'chef', shirt: '#f4f4f4', apron: '#ffffff', pants: '#34495e', held: 'ladle', fat: true, bubble: 'Суп готов!' }), { anim: 'stir', flip: 1 });
-      ent('cauldron', x - 22 * s, y + 1, {});
+      cook.iconWith = [ent('cauldron', x - 22 * s, y + 1, {})];
       ent('fishCrate', x + 45 * s, y - 1, {});
       ent('cat', x + 85 * s, y + 1, { color: pick(CATC), pose: 'reach' }, { flip: -1 });
       return cook;
     }
   },
   { key: 'goatGlasses', name: 'Коза в очках', w: 70, d: 30, build: (x, y) => ent('goat', x, y, { color: pick(['#f2efe6', '#d9c4a0', '#8a8a8a']), glasses: true }) },
-  { key: 'purpleLamp', name: 'Фиолетовый фонарь', w: 50, d: 25, build: (x, y) => { ent('crate', x, y, { color: '#b98546' }); return ent('lamp', x, y + .5, { color: '#a64dff' }, { z: 38 }); } },
+  { key: 'purpleLamp', name: 'Фиолетовый фонарь', w: 50, d: 25, build: (x, y) => { const c = ent('crate', x, y, { color: '#b98546' }); const e = ent('lamp', x, y + .5, { color: '#a64dff' }, { z: 38 }); e.iconWith = [c]; return e; } },
   { key: 'juggler', name: 'Жонглёр', w: 60, d: 30, build: (x, y) => ent('person', x, y, mkPerson({ dress: false, hat: 'jester', shirt: '#7b2cbf', pants: '#e63946', pattern: 'jester', beard: false }), { anim: 'juggle' }) },
   { key: 'whiteHorse', name: 'Белая лошадь', w: 150, d: 35, build: (x, y) => { ent('hay', x + 70 * depthScale(y), y + 2, {}); return ent('horse', x - 10 * depthScale(y), y, { color: '#f4f1ea', mane: '#c9c3b5', saddle: chance(.5) ? '#c0392b' : null }, { flip: 1 }); } },
   {
@@ -1048,12 +1048,12 @@ const TARGET_POOL = [
   },
   { key: 'greenTopHat', name: 'Господин в зелёном цилиндре', w: 55, d: 30, build: (x, y) => ent('person', x, y, mkPerson({ dress: false, hat: 'top', hatC: '#1e9e3e', bandC: '#ffd23f', beard: chance(.5) }), { anim: pick(['wave', 'idle', 'shout']) }) },
   { key: 'witch', name: 'Ведьма с метлой', w: 60, d: 30, build: (x, y) => ent('person', x, y, mkPerson({ dress: true, hat: 'witch', hatC: '#2d1b4e', shirt: '#4a2c6f', skin: '#b8d8a0', hair: 'long', hairC: '#e66a1f', held: 'broom' }), { anim: 'broom' }) },
-  { key: 'fishbowl', name: 'Золотая рыбка в банке', w: 50, d: 25, build: (x, y) => { ent('crate', x, y, { color: '#a67c52' }); return ent('fishbowl', x, y + .5, {}, { z: 38 }); } },
+  { key: 'fishbowl', name: 'Золотая рыбка в банке', w: 50, d: 25, build: (x, y) => { const c = ent('crate', x, y, { color: '#a67c52' }); const e = ent('fishbowl', x, y + .5, {}, { z: 38 }); e.iconWith = [c]; return e; } },
   { key: 'owl', name: 'Сова', wall: true, build: (x, y) => ent('owl', x, y, {}, { s: .95 }) },
   {
     key: 'smith', name: 'Кузнец с молотом', w: 130, d: 30, build: (x, y) => {
       const sm = ent('person', x - 30 * depthScale(y), y, mkPerson({ dress: false, fat: true, hat: 'bandana', hatC: '#333', apron: '#6d4127', shirt: '#b5651d', held: 'hammer' }), { anim: 'hammer', flip: 1 });
-      const an = ent('anvil', sm.x + 52 * sm.s, y + 1, {}, { flip: 1 }); an.link = sm;
+      const an = ent('anvil', sm.x + 52 * sm.s, y + 1, {}, { flip: 1 }); an.link = sm; sm.iconWith = [an];
       return sm;
     }
   },
@@ -1118,7 +1118,7 @@ const FILLERS = [
     }
   },
   { wgt: 5, w: 40, d: 25, build: (x, y) => ent('person', x, y, mkPerson({ kid: true, beard: false, held: pick([null, 'ball', 'flower', 'apple', 'bread']) }), { anim: pick(['jump', 'idle', 'wave', 'dance', 'play']) }) },
-  { wgt: 6, w: 60, d: 25, build: (x, y) => ent('cat', x, y, { color: pick(CATC), hat: chance(.45) ? pick(CAT_HATC) : null, pose: pick(['stand', 'sit', 'sit', 'sleep']) }) },
+  { wgt: 6, w: 60, d: 25, build: (x, y) => ent('cat', x, y, { color: pick(CATC), hat: chance(.45) ? pick(CAT_HATC) : null, pose: pick(['stand', 'sit', 'sit']) }) },
   { wgt: 5, w: 80, d: 25, build: (x, y) => ent('dog', x, y, { color: pick(DOGC), pose: pick(['stand', 'sit', 'wag']), spot: chance(.4) ? '#5a3825' : null, collar: chance(.6) ? pick(['#e63946', '#1d6fe0', '#2ecc71']) : null }) },
   { wgt: 4, w: 90, d: 25, build: (x, y) => { const s = depthScale(y); ent('grain', x, y - 3, {}); for (let i = 0; i < 3; i++) ent(pick(['chicken', 'chicken', 'pigeon']), x + (i - 1) * 30 * s, y + rnd(-3, 3), { color: pick(['#f7f3ea', '#b5652b', '#d9a066']) }); } },
   { wgt: 3, w: 90, d: 20, build: (x, y) => { const s = depthScale(y); ent('grain', x, y - 2, {}); for (let i = 0; i < 4; i++) ent(i % 2 ? 'sparrow' : 'pigeon', x + (i - 1.5) * 20 * s, y + rnd(-3, 3), {}); } },
@@ -1126,7 +1126,7 @@ const FILLERS = [
   { wgt: 4, w: 55, d: 30, build: (x, y) => { ent('crate', x, y, { color: pick(['#c8964f', '#b98546', '#d4a86a']) }); if (chance(.7)) ent(pick(['lamp', 'basket', 'clock', 'vase', 'bookStack', 'cake']), x, y + .5, { color: pick(LAMPC), fruit: pick(['#e53935', '#9ccc3c', '#ff9f1a']) }, { z: 38 }); } },
   { wgt: 4, w: 50, d: 20, build: (x, y) => ent(pick(['basket', 'pumpkin', 'cheese', 'vase', 'bookStack', 'flowers', 'sack']), x, y, { color: pick(['#c1693c', '#8b4513', '#5d8aa8']), fruit: pick(['#e53935', '#9ccc3c', '#ff9f1a']) }) },
   { wgt: 3, w: 40, d: 15, build: (x, y) => ent(pick(['key', 'apple', 'apple']), x, y, { color: pick(KEYC.concat(['#e53935', '#9ccc3c'])) }) },
-  { wgt: 2, w: 50, d: 20, build: (x, y) => ent(pick(['hatItem', 'umbrellaItem']), x, y, { kind: pick(['top', 'straw']), color: pick(TOPHATC.concat(UMBC)) }) },
+  { wgt: 2, w: 50, d: 20, build: (x, y) => { const tp = pick(['hatItem', 'umbrellaItem']); ent(tp, x, y, { kind: pick(['top', 'straw']), color: pick(tp === 'hatItem' ? TOPHATC : UMBC) }); } },
   { wgt: 2, w: 60, d: 20, build: (x, y) => { ent('sack', x - 12 * depthScale(y), y - 2, {}); ent('mouse', x + 16 * depthScale(y), y, {}); } },
   { wgt: 2, w: 80, d: 25, build: (x, y) => ent('goat', x, y, { color: pick(['#f2efe6', '#d9c4a0', '#8a8a8a', '#5d4037']) }) },
   { wgt: 2, w: 80, d: 25, build: (x, y) => ent('pig', x, y, { hat: chance(.3) ? 'cap' : null }) },
@@ -1171,7 +1171,7 @@ function buildScene(targetKeys) {
   for (const sl of wallSlots) {
     if (sl.used) continue;
     if (sl.sill) { ent(chance(.6) ? 'pigeon' : 'sparrow', sl.x, sl.y, {}, { s: .7 }); if (chance(.5)) ent('pigeon', sl.x + 26, sl.y, {}, { s: .7 }); }
-    else ent(pick(['wallClock', 'wallClock', 'shield', 'lamp', 'vase']), sl.x, sl.y, { color: pick(['#6d4c41', '#2980b9', '#c0392b', '#27ae60', '#c1693c']) }, { s: .9 });
+    else { const tp = pick(['wallClock', 'wallClock', 'shield', 'lamp', 'vase']); ent(tp, sl.x, sl.y, { color: tp === 'lamp' ? pick(LAMPC) : pick(['#6d4c41', '#2980b9', '#c0392b', '#27ae60', '#c1693c']) }, { s: .9 }); }
   }
   // --- прилавки (жёсткие зоны: за ними ничего не прячем)
   const kinds = shuffle(Object.keys(STALLS)).slice(0, 13);
@@ -1408,14 +1408,19 @@ const particles = [];   // звёздочки в мировых координа
 const rings = [];       // вспышки
 const misses = [];      // красные крестики в экранных координатах
 function hitTarget(wx, wy) {
-  const pad = 8 / S();
+  const pad = 10 / S(), minHalf = 24 / S();
   let best = null, bestD = Infinity;
   for (const e of game.targets) {
     if (e.found) continue;
-    const b = e.wb;
-    if (wx >= b.x0 - pad && wx <= b.x1 + pad && wy >= b.y0 - pad && wy <= b.y1 + pad) {
-      const d = Math.hypot(wx - (b.x0 + b.x1) / 2, wy - (b.y0 + b.y1) / 2);
-      if (d < bestD) { bestD = d; best = e; }
+    // сама цель (не меньше 48 px на экране) + её окружение: ящик, котёл, наковальня
+    const w = e.wb, mx = (w.x0 + w.x1) / 2, my = (w.y0 + w.y1) / 2;
+    const boxes = [{ x0: Math.min(w.x0, mx - minHalf), x1: Math.max(w.x1, mx + minHalf), y0: Math.min(w.y0, my - minHalf), y1: Math.max(w.y1, my + minHalf) }];
+    for (const m of e.iconWith || []) boxes.push(m.wb);
+    for (const b of boxes) {
+      if (wx >= b.x0 - pad && wx <= b.x1 + pad && wy >= b.y0 - pad && wy <= b.y1 + pad) {
+        const d = Math.hypot(wx - mx, wy - my);
+        if (d < bestD) { bestD = d; best = e; }
+      }
     }
   }
   return best;
@@ -1445,7 +1450,7 @@ function foundTarget(e) {
   const li = e.li; li.classList.add('found', 'pulse');
   li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   updateHud();
-  if (game.found === game.targets.length) setTimeout(showWin, 1100);
+  if (game.found === game.targets.length) { game.running = false; game.endTime = performance.now(); game.winTimer = setTimeout(showWin, 1100); }
 }
 
 /* ---------------- 8. Панель целей, подсказки, победа ---------------- */
@@ -1456,12 +1461,17 @@ function renderIcon(e) {
   const c = document.createElement('canvas');
   const px = 104; c.width = px; c.height = px;
   const ic = c.getContext('2d');
-  const b = boxOf(e), w = b[2] - b[0], h = b[3] - b[1];
-  const k = Math.min(86 / w, 86 / h);
+  const group = (e.iconWith || []).concat([e]).sort((a, b) => (a.y - b.y) || (a.order - b.order));
+  const boxes = group.map(worldBox);
+  const u = { x0: Math.min(...boxes.map(b => b.x0)), y0: Math.min(...boxes.map(b => b.y0)), x1: Math.max(...boxes.map(b => b.x1)), y1: Math.max(...boxes.map(b => b.y1)) };
+  const k = Math.min(88 / (u.x1 - u.x0), 88 / (u.y1 - u.y0));
   const prevG = g, prevF = FLIP;
-  g = ic; ICON = true; FLIP = 1;
-  ic.translate(px / 2, px / 2); ic.scale(k, k); ic.translate(-(b[0] + b[2]) / 2, -(b[1] + b[3]) / 2);
-  DRAW[e.type].draw(e, 0.3);
+  g = ic; ICON = true;
+  ic.translate(px / 2, px / 2); ic.scale(k, k); ic.translate(-(u.x0 + u.x1) / 2, -(u.y0 + u.y1) / 2);
+  for (const m of group) {
+    ic.save(); ic.translate(m.x, m.y - (m.z || 0) * m.s); ic.scale(m.s * m.flip, m.s); FLIP = m.flip;
+    DRAW[m.type].draw(m, 0.3); ic.restore();
+  }
   g = prevG; ICON = false; FLIP = prevF;
   return c;
 }
@@ -1499,6 +1509,7 @@ document.getElementById('hintBtn').onclick = () => {
 };
 
 function newGame(hard) {
+  clearTimeout(game.winTimer);
   game.hard = hard;
   const keys = shuffle(TARGET_POOL.map(d => d.key)).slice(0, TARGET_COUNT);
   game.targets = buildScene(keys);
@@ -1515,7 +1526,6 @@ function newGame(hard) {
   console.log('Объектов на сцене:', entities.length);
 }
 function showWin() {
-  game.running = false; game.endTime = performance.now();
   const sec = elapsed();
   document.getElementById('winTime').textContent = fmt(sec);
   document.getElementById('winMiss').textContent = game.misses;
