@@ -63,9 +63,10 @@ function recalc() {
   const add = (st) => { for (const k in st) { const v = st[k]; switch (k) { case 'hp': s.maxHp += v; break; case 'res': s.maxRes += v; break; case 'luck': s.luck += v; break; case 'xp': s.xp += v; break; default: s[k] = (s[k] || 0) + v; } } };
   for (const sl in p.equip) { const it = ITEMS[p.equip[sl]]; if (!it) continue; const pl = (p.plus && p.plus[sl]) || 0, st = Object.assign({}, it.stats); if (pl) { if (st.dmg) st.dmg *= 1 + 0.1 * pl; if (st.def) st.def *= 1 + 0.1 * pl; if (st.hp) st.hp *= 1 + 0.1 * pl; } add(st); }
   const m = R.mods; if (m.xp) s.xp *= m.xp; if (m.crit) s.crit += m.crit; if (m.regen) s.regen *= m.regen; if (m.def) s.def *= m.def; if (m.gold) s.gold *= m.gold; if (m.dmg) s.dmg *= m.dmg; if (m.hp) s.maxHp *= m.hp; if (m.dodge) s.dodge += m.dodge; if (m.luck) s.luck *= m.luck;
-  const sk = id => p.skills[id] || 0, sv = id => SKILLS[id].v[sk(id) - 1];
+  const sk = id => { const r = p.skills[id] || 0; return (r && SKILLS[id].type === 'passive' && !(p.loadout && p.loadout.pas.includes(id))) ? 0 : r; }, sv = id => SKILLS[id].v[sk(id) - 1];
   if (sk('bloodlust')) s.lifesteal += sv('bloodlust') / 100; if (sk('unbroken')) s.maxHp *= 1 + sv('unbroken') / 100;
   if (sk('wisdom')) { s.maxRes *= 1 + sv('wisdom') / 100; s.regen *= 1 + sv('wisdom') / 100; }
+  if (sk('frenzy')) s.atkSpd *= 1 + sv('frenzy') / 100; if (sk('coldblood')) s.critDmg += sv('coldblood') / 100; if (sk('arcanemight')) s.dmg *= 1 + sv('arcanemight') / 100; s.formDrain = sk('spirit') ? 1 - sv('spirit') / 100 : 1; if (sk('beastmaster')) { s.petDmg += sv('beastmaster') / 100; s.petHp += sv('beastmaster') / 100; }
   if (sk('deadly')) s.crit += sv('deadly') / 100; if (sk('evasion')) s.dodge += sv('evasion') / 100; if (sk('barkskin')) s.def *= 1 + sv('barkskin') / 100;
   if (sk('bond')) { s.petDmg += sv('bond') / 100; s.petHp += sv('bond') / 100; } if (sk('eagleeye')) { s.crit += sv('eagleeye') / 100; s.range *= 1.1; }
   // питомец

@@ -241,7 +241,7 @@ function nearbyInteractable() {
   for (const o of objs) {
     if (!T_OK[o.t]) continue; if (Math.abs(o.x - P.x) > 64 || Math.abs(o.y - P.y) > 64) continue; if (o.cd > 0) continue;
     if (o.t === 'chest' && G.opened.has(o.id)) continue; if (o.t === 'table' && G.prof.flags.letter) continue; const d = Math.hypot(o.x - P.x, o.y - 8 - P.y), lim = o.t === 'plot' ? 30 : o.t === 'portal' ? 46 : 52;
-    if (d < lim && d < bd) { bd = d; const lab = { chest: 'Открыть сундук', herb: 'Собрать: Лунный корень', ore: 'Добыть: Железная руда', plot: plotLabel(o), portal: o.exit ? 'Выйти из подземелья' : `Войти: ${o.label} (рек. ур. ${o.lvl})`, door: o.label, ibed: 'Лечь спать (после 18:00)', table: 'Прочесть письмо деда', stove: 'Плита: готовить', bin: 'Ящик отгрузки', board: 'Доска заказов' }; best = { type: o.t, o, label: lab[o.t] }; }
+    if (d < lim && d < bd) { bd = d; const lab = { chest: o.boss ? '⭐ Открыть сундук босса' : 'Открыть сундук', herb: 'Собрать: Лунный корень', ore: 'Добыть: Железная руда', plot: plotLabel(o), portal: o.exit ? 'Выйти из подземелья' : `Войти: ${o.label} (рек. ур. ${o.lvl})`, door: o.label, ibed: 'Лечь спать (после 18:00)', table: 'Прочесть письмо деда', stove: 'Плита: готовить', bin: 'Ящик отгрузки', board: 'Доска заказов' }; best = { type: o.t, o, label: lab[o.t] }; }
   }
   if (!best || bd > 24) { const w = waterAhead(); if (w && (!best || best.type !== 'npc')) best = { type: 'water', o: w, label: 'Рыбачить (удочка)' }; }
   return best;
@@ -260,7 +260,7 @@ function interact() {
   else if (it.type === 'board') openBoard();
   else if (it.type === 'npc') openDialog(it.n);
   else if (it.type === 'chest') {
-    const o = it.o; G.opened.add(o.id); if (o.id === 'home_chest') tutAdvance(1); G.prof.opened = Array.from(G.opened); Snd.play('pickup'); const g = Math.round(o.gold * G.S.gold); addGold(g); floatText(o.x, o.y - 30, `+${g}💰`, '#fd4'); (o.loot || []).forEach(([id, n]) => addItem(id, n)); logMsg(`Сундук открыт: +${g} золота`, 'good'); burst(o.x, o.y - 14, '#ffd23a', 16, 60);
+    const o = it.o; G.opened.add(o.id); if (o.boss) { G.prof.bossChests = (G.prof.bossChests || []).filter(c => c.id !== o.id); G.world.objs = G.world.objs.filter(x => x !== o); } if (o.id === 'home_chest') tutAdvance(1); G.prof.opened = Array.from(G.opened); Snd.play('pickup'); const g = Math.round(o.gold * G.S.gold); addGold(g); floatText(o.x, o.y - 30, `+${g}💰`, '#fd4'); (o.loot || []).forEach(([id, n]) => addItem(id, n)); logMsg(`Сундук открыт: +${g} золота`, 'good'); burst(o.x, o.y - 14, '#ffd23a', 16, 60);
   } else { const o = it.o; addItem(o.item, 1); o.cd = 1; Snd.play('pickup'); burst(o.x, o.y - 10, o.t === 'herb' ? '#6f6' : '#fc8', 10, 40); later(90, () => { o.cd = 0; }); }
 }
 
@@ -290,9 +290,9 @@ function startGame(prof) {
   G.prof = prof; G.P = makePlayer(); G.P.buffs = []; G.min = prof.min || START_ABS_MIN; G.opened = new Set(prof.opened); G.revealed = decodeRevealed(prof.revealed);
   G.cd = {}; G.proj = []; G.fx = []; G.texts = []; G.areas = []; G.timers = []; G.lightning = []; G.log = []; G.dialog = null; G.shop = null; G.panel = null; G.paused = false; G.target = null; G.tourney = null; G.raid = null; G.fish = null; G.rainedToday = false; G.events = {}; G.potCd = { hp: 0, rs: 0 };
   G.world.objs.forEach(o => { if (o.cd) o.cd = 0; });
-  recalc(); if (prof.hp >= 9000) { G.P.hp = G.P.maxHp; G.P.res = G.P.maxRes; } else { G.P.hp = clamp(prof.hp, 1, G.P.maxHp); G.P.res = clamp(prof.res, 0, G.P.maxRes); }
+  ensureLoadout(); recalc(); if (prof.hp >= 9000) { G.P.hp = G.P.maxHp; G.P.res = G.P.maxRes; } else { G.P.hp = clamp(prof.hp, 1, G.P.maxHp); G.P.res = clamp(prof.res, 0, G.P.maxRes); }
   if (CLASSES[prof.cls].res === 'rage') G.P.res = 0;
-  G.world.paintMini(G.revealed); spawnMonsters(); initNPCs(); G.petEnt = null; if (prof.activePet && prof.pets.find(p => p.uid === prof.activePet)) summonPet(prof.activePet); else prof.activePet = null;
+  restoreBossChests(); G.world.paintMini(G.revealed); spawnMonsters(); initNPCs(); G.petEnt = null; if (prof.activePet && prof.pets.find(p => p.uid === prof.activePet)) summonPet(prof.activePet); else prof.activePet = null;
   updateEvents(true); G.mode = 'play'; G.cam.x = G.P.x - 400; G.cam.y = G.P.y - 300; _lastMin = -1; G.lastSave = G.t;
   Save.setLast(prof.id); UI.enterGame(); Snd.startMusic(); logMsg(`Добро пожаловать, ${prof.name}!`, 'good');
   if (!prof.flags.intro) { prof.flags.intro = true; UI.showIntro(); }

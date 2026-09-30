@@ -78,7 +78,7 @@ UI.hudFrame = function (dt) {
   UI.updateCooldowns(); UI.drawMinimap(dt);
   if (UI.dirty) { UI.dirty = false; if (G.panel) UI.renderPanel(); if (G.shop) UI.renderShop(); }
 };
-UI.actionSig = function () { const p = G.prof; return [p.cls, Object.keys(p.skills).length, Object.values(p.skills).join(''), p.equip.weapon, G.P.form, countItem('hp_0') + countItem('hp_1') + countItem('hp_2'), countItem('rs_0') + countItem('rs_1') + countItem('rs_2'), p.inv.filter(s => ITEMS[s.id].type === 'elixir').length, G.petEnt ? 1 : 0, p.pets.length].join('|'); };
+UI.actionSig = function () { const p = G.prof; return [p.cls, Object.keys(p.skills).length, Object.values(p.skills).join(''), (p.loadout ? p.loadout.act.join('') : ''), p.equip.weapon, G.P.form, countItem('hp_0') + countItem('hp_1') + countItem('hp_2'), countItem('rs_0') + countItem('rs_1') + countItem('rs_2'), p.inv.filter(s => ITEMS[s.id].type === 'elixir').length, G.petEnt ? 1 : 0, p.pets.length].join('|'); };
 UI.updateMenuBtns = function () { const p = G.prof; $$('#h-menu .mbtn').forEach(b => { b.classList.toggle('on', G.panel === b.dataset.tab); b.classList.toggle('alert', b.dataset.tab === 'skills' && p.sp > 0); }); const m = $('#h-menu [data-tab=pets]'); if (m) m.style.display = p.cls === 'hunter' ? '' : 'none'; };
 UI.buildActionBar = function () {
   const bar = $('#h-action'), p = G.prof, C = CLASSES[p.cls]; bar.innerHTML = '';

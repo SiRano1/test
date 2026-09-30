@@ -46,16 +46,16 @@ const MSTYLES = {
   skmage: { top: '#3a2a5a', bottom: '#3a2a5a', boots: '#2a1a4a', robe: true, skeleton: true, hat: 'hood', hatCol: '#3a2a5a', wp: 'staff' }
 };
 
-function drawWeaponShape(ctx, wt, tier, glow, t) {
+function drawWeaponShape(ctx, wt, tier, glow, t, ex) {
   const m = METAL[Math.min(tier, 4)] || '#aaa', wood = '#6a4a2a', dk = '#3a3a44';
   const R = (x, y, w, h, c) => { ctx.fillStyle = OUT; ctx.fillRect(x - 0.6, y - 0.6, w + 1.2, h + 1.2); ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
   switch (wt) {
     case 'axe': R(-0.5, -10, 1, 11, wood); R(0.5, -10, 4, 5, m); R(3.5, -9.5, 1.2, 4, '#fff'); R(-2.5, -9, 2, 2, dk); R(-0.5, -1, 1, 2, '#3a2a1a'); break;
     case 'staff': R(-0.5, -13, 1, 15, wood); ctx.fillStyle = OUT; ctx.beginPath(); ctx.arc(0, -14.6, 2.7, 0, TAU); ctx.fill(); ctx.fillStyle = m; ctx.beginPath(); ctx.arc(0, -14.6, 2, 0, TAU); ctx.fill(); ctx.fillStyle = '#fff'; ctx.fillRect(-0.9, -15.5, 0.9, 0.9);
-      if (glow) { ctx.fillStyle = m; ctx.globalAlpha = 0.35 + 0.15 * Math.sin((t || 0) * 8); ctx.beginPath(); ctx.arc(0, -14.6, 4.5, 0, TAU); ctx.fill(); ctx.globalAlpha = 1; } break;
+      if (glow) { const ch = (ex && ex.charge) || 0; ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = m; ctx.globalAlpha = 0.35 + 0.15 * Math.sin((t || 0) * 8) + ch * 0.3; ctx.beginPath(); ctx.arc(0, -14.6, 4.5 + ch * 5, 0, TAU); ctx.fill(); ctx.globalAlpha = 0.5 * ch; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(0, -14.6, 2 + ch * 2, 0, TAU); ctx.fill(); ctx.restore(); } break;
     case 'dagger': R(-0.5, -6.5, 1, 6, m); R(-1.8, -1.2, 3.6, 1, '#8a6a3a'); R(-0.5, -0.4, 1, 2, '#3a2a1a'); break;
     case 'sickle': R(-0.5, -9, 1, 10, wood); R(0.4, -10.5, 3, 1.4, m); R(2.6, -9.4, 1.2, 2.4, m); R(0.6, -8.7, 1.2, 1, m); break;
-    case 'bow': R(0.5, -5, 0.8, 9, '#c8c0a0'); R(-1.5, -8.5, 1.4, 2, wood); R(-2.4, -6.7, 1.4, 3.2, wood); R(-2.6, -3.7, 1.6, 4, wood); R(-2.4, -0.2, 1.4, 3.2, wood); R(-1.5, 2.2, 1.4, 2, wood); ctx.fillStyle = m; ctx.fillRect(-2.6, -3.5, 1.2, 1); break;
+    case 'bow': { const pull = (ex && ex.pull) || 0; if (pull > 0) { ctx.strokeStyle = '#e8e0c0'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.moveTo(0.4, -8.4); ctx.lineTo(0.4 - pull * 3.6, -0.4); ctx.lineTo(0.4, 5.2); ctx.stroke(); if (ex.arrow) { R(0.4 - pull * 3.6, -1, 9 + pull * 3.6, 1, '#d8c8a0'); R(9.4, -1.6, 2.2, 2.2, '#dfe6ee'); R(-pull * 3.6 - 0.4, -1.8, 1.6, 2.6, '#c8402a'); } } else R(0.5, -5, 0.8, 9, '#c8c0a0'); } R(-1.5, -8.5, 1.4, 2, wood); R(-2.4, -6.7, 1.4, 3.2, wood); R(-2.6, -3.7, 1.6, 4, wood); R(-2.4, -0.2, 1.4, 3.2, wood); R(-1.5, 2.2, 1.4, 2, wood); ctx.fillStyle = m; ctx.fillRect(-2.6, -3.5, 1.2, 1); break;
     case 'sword': R(-0.5, -9, 1.2, 9, '#c8ccd4'); R(-2, -0.8, 4, 1, '#6a4a2a'); R(-0.4, 0, 1, 2, '#3a2a1a'); break;
     case 'club': R(-0.8, -9, 1.6, 10, '#5a3a20'); R(-2, -11, 4, 4, '#6a4a2a'); R(-2.6, -10, 1, 1, '#aaa'); R(1.6, -9, 1, 1, '#aaa'); break;
   }
@@ -104,8 +104,17 @@ function drawHuman(ctx, o) {
   if (o.dead > 0) { ctx.rotate(Math.min(1, o.dead) * 1.45 * flip); ctx.translate(0, -o.dead * 4); ctx.globalAlpha = (o.alpha === undefined ? 1 : o.alpha) * (1 - Math.max(0, o.dead - 0.6) / 0.4); }
   ctx.scale(2 * sc * flip, 2 * sc);
   if (o.aura) { ctx.globalAlpha *= 0.6; ctx.fillStyle = o.aura; ctx.beginPath(); ctx.ellipse(0, -8, 9, 11, 0, 0, TAU); ctx.fill(); ctx.globalAlpha = o.alpha === undefined ? 1 : o.alpha; }
-  const lunge = (atk && atkP >= 0.3 && atkP <= 0.7 && view === 'side' && atk.kind !== 'cast') ? 1.6 : 0;
-  ctx.translate(lunge, 0);
+  let lunge = 0, lean = 0, squash = 0, sx = 1;
+  if (atk && atkP >= 0) {
+    const k = atk.kind, ez = q => 1 - (1 - q) * (1 - q);
+    if (k === 'slash') { if (atkP < 0.3) { const q = atkP / 0.3; lean = -0.18 * q; lunge = -1.3 * q; squash = 0.07 * q; } else if (atkP < 0.6) { const q = ez((atkP - 0.3) / 0.3); lean = lerp(-0.18, 0.3, q); lunge = lerp(-1.3, 2.8, q); squash = lerp(0.07, -0.06, q); } else { const q = (atkP - 0.6) / 0.4; lean = lerp(0.3, 0, q); lunge = lerp(2.8, 0, q); } }
+    else if (k === 'stab') { const ph = (atkP * 2) % 1, th = Math.sin(ph * Math.PI); lean = 0.14 * th; lunge = 2.6 * th; squash = -0.04 * th; }
+    else if (k === 'shoot') { if (atkP < 0.5) { const q = atkP / 0.5; lean = -0.05 * q; lunge = -0.8 * q; } else { const q = Math.min(1, (atkP - 0.5) * 3); lean = -0.1 * (1 - q); lunge = -1.6 * (1 - q); } }
+    else if (k === 'cast') { const q = Math.sin(Math.min(1, atkP) * Math.PI); lean = -0.05 * q; squash = -0.06 * q; lunge = -0.5 * q; }
+    else if (k === 'spin') { sx = 0.35 + 0.65 * Math.abs(Math.cos(atkP * Math.PI * 5)); squash = 0.03; }
+  }
+  if (o.dashLean) lean = 0.4;
+  ctx.translate(lunge, 0); if (lean) ctx.rotate(lean); if (squash || sx !== 1) ctx.scale(sx * (1 - squash * 0.4), 1 + squash);
 
   const bodyY = bob, robe = S.robe;
   const skinD = mix(skin, '#000000', 0.15);
@@ -159,7 +168,7 @@ function drawHuman(ctx, o) {
     dd(0.5, ay + 4.2 + (castUp ? -2 : 0), 2, 1.2, skin);
     P.flush = true;
     flushParts(ctx, P, D);
-    if (o.weapon) { ctx.save(); ctx.translate(wx + 0.8, wy + (castUp ? -2 : 0)); ctx.rotate(ang); if (o.weapon.wtype === 'bow' && atk && atk.kind === 'shoot') { ctx.translate(2, 0); } drawWeaponShape(ctx, o.weapon.wtype, o.weapon.tier, atk && atk.kind === 'cast', t); ctx.restore(); }
+    if (o.weapon) { const ex = weaponExtra(atk, atkP); const tr = (atk && (atk.kind === 'slash' || atk.kind === 'spin') && atkP > 0.28 && atkP < 0.66) ? 3 : 0; for (let g = tr; g >= 0; g--) { ctx.save(); ctx.translate(wx + 0.8, wy + (castUp ? -2 : 0)); ctx.rotate(ang - g * 0.42 * (atk && atk.kind === 'spin' ? -1 : 1)); if (g) ctx.globalAlpha = 0.34 - g * 0.09; if (o.weapon.wtype === 'bow' && atk && atk.kind === 'shoot') { ctx.translate(2, 0); } drawWeaponShape(ctx, o.weapon.wtype, o.weapon.tier, atk && atk.kind === 'cast', t, ex); ctx.restore(); } }
     else if (ms && ms.wp) { ctx.save(); ctx.translate(wx + 0.8, wy); ctx.rotate(ang); drawWeaponShape(ctx, ms.wp, 0, ms.fire, t); ctx.restore(); }
   } else {
     /* ---------- вид спереди / сзади ---------- */
@@ -229,7 +238,7 @@ function drawHuman(ctx, o) {
         else if (atk.kind === 'spin') ang = atkP * TAU * 2;
       }
       if (o.weapon.wtype === 'bow') { wx = back ? tw / 2 + 1 : -tw / 2 - 1; wy = ay + 2; }
-      ctx.save(); ctx.translate(wx + (o.weapon.wtype === 'bow' ? 0 : 1), wy + (castUp ? -3 : 0)); ctx.rotate(ang); drawWeaponShape(ctx, o.weapon.wtype, o.weapon.tier, atk && atk.kind === 'cast', t); ctx.restore();
+      { const ex = weaponExtra(atk, atkP), tr = (atk && (atk.kind === 'slash' || atk.kind === 'spin') && atkP > 0.28 && atkP < 0.66) ? 3 : 0; for (let g = tr; g >= 0; g--) { ctx.save(); ctx.translate(wx + (o.weapon.wtype === 'bow' ? 0 : 1), wy + (castUp ? -3 : 0)); ctx.rotate(ang - g * 0.42); if (g) ctx.globalAlpha = 0.34 - g * 0.09; drawWeaponShape(ctx, o.weapon.wtype, o.weapon.tier, atk && atk.kind === 'cast', t, ex); ctx.restore(); } }
     } else if (ms && ms.wp) { ctx.save(); ctx.translate(tw / 2 + 2, ay + 5); ctx.rotate(0.15); drawWeaponShape(ctx, ms.wp, 0, ms.fire, t); ctx.restore(); }
   }
   if (o.horns || (S.horns)) { /* рога у боссов уже в шляпе */ }
@@ -303,7 +312,7 @@ function drawCreature(ctx, o) {
   const mv = !!o.moving, ph = mv ? Math.sin(t * 12) : 0, bob = mv ? -Math.abs(ph) * 0.7 : Math.sin(t * 2) * 0.3;
   const P = [], D = [];
   const pp = (x, y, w, h, c) => P.push([x, y, w, h, c]), dd = (x, y, w, h, c) => D.push([x, y, w, h, c]);
-  const atkP = o.atk ? o.atk.p : -1, lunge = (atkP >= 0.25 && atkP <= 0.6) ? 3 : 0;
+  const atkP = o.atk ? o.atk.p : -1;
   ctx.save();
   if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
   ctx.translate(Math.round(o.x), Math.round(o.y));
@@ -312,7 +321,7 @@ function drawCreature(ctx, o) {
   if (o.dead > 0) { ctx.rotate(Math.min(1, o.dead) * 1.5 * flip); ctx.globalAlpha = (o.alpha === undefined ? 1 : o.alpha) * (1 - Math.max(0, o.dead - 0.6) / 0.4); }
   if (o.aura) { ctx.save(); ctx.globalAlpha *= 0.5 + 0.2 * Math.sin(t * 4); ctx.fillStyle = o.aura; ctx.beginPath(); ctx.ellipse(0, -8 * sz, 10 * sz, 11 * sz, 0, 0, TAU); ctx.fill(); ctx.restore(); }
   ctx.scale(2 * sz * flip, 2 * sz);
-  ctx.translate(lunge, 0);
+  const wind = (atkP >= 0 && atkP < 0.5) ? atkP / 0.5 : 0, lunge2 = (atkP >= 0.5 && atkP <= 0.72) ? 6 : 0; ctx.translate(lunge2 - wind * 2.2, 0); if (wind) ctx.scale(1 + wind * 0.08, 1 - wind * 0.1); if (o.kx) ctx.translate(o.kx / (2 * sz * flip), o.ky ? o.ky / (2 * sz) : 0);
   const id = o.id;
   switch (o.kind) {
     case 'quad': {
@@ -406,4 +415,11 @@ function drawCreature(ctx, o) {
   }
   flushParts(ctx, P, D);
   ctx.restore();
+}
+
+function weaponExtra(atk, p) {
+  if (!atk || p < 0) return null;
+  if (atk.kind === 'shoot') return { pull: p < 0.5 ? p / 0.5 : Math.max(0, 1 - (p - 0.5) * 7), arrow: p < 0.52 };
+  if (atk.kind === 'cast') return { charge: Math.sin(Math.min(1, p) * Math.PI * 0.85) };
+  return null;
 }

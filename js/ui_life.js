@@ -56,3 +56,29 @@ UI.renderProjects = function () {
   });
   f.det.innerHTML = '<p class="hint">Проекты города дают постоянные бонусы. Материалы — с фермы, из рыбалки, крафта и трофеев.</p>';
 };
+
+/* ---------- Ветка умений: подписи «активное / пассивное», слоты, выбор экипировки ---------- */
+UI.tabSkills = function (b) {
+  const p = G.prof, C = CLASSES[p.cls], L = ensureLoadout(), pmax = PASSIVE_SLOTS();
+  b.innerHTML = `<div class="sk-head"><h3>${C.icon} Умения: ${C.name}</h3><div class="sp">Очков умений: <b>${p.sp}</b></div></div>
+  <div class="sk-slots"><div class="sk-sl"><b>Активные (клавиши 1–5)</b><div class="slrow" id="slA"></div></div><div class="sk-sl"><b>Пассивные (${pmax} слота${p.lvl < 10 ? ', 3-й с 10 ур.' : ''})</b><div class="slrow" id="slP"></div></div></div>
+  <div class="sk-cols" id="skc"></div><p class="hint">Изучайте умения очками и выбирайте, что носить: нажмите «Экипировать» на карточке или щёлкните слот, чтобы снять. Пассивные умения работают только из слотов. 2-й и 3-й ярусы открываются после умения предыдущего яруса.</p>`;
+  const mkSlot = (id, list, i, max) => { const S = id && SKILLS[id]; const s = el('div', 'sl' + (S ? ' full ' + S.type : ' empty'), S ? `<span>${S.icon}</span><small>${list === L.act ? i + 1 : 'П'}</small>` : `<small>${i + 1}</small>`); if (S) { s.onclick = () => toggleEquip(id); tipOn(s, () => `<div class="tt-name">${S.icon} ${S.name}</div><div class="tt-sub">${SKILL_TYPE_LABEL[S.type]} · нажмите, чтобы снять</div>`); } return s; };
+  for (let i = 0; i < ACTIVE_SLOTS; i++) $('#slA').appendChild(mkSlot(L.act[i], L.act, i));
+  for (let i = 0; i < pmax; i++) $('#slP').appendChild(mkSlot(L.pas[i], L.pas, i));
+  const cols = $('#skc');
+  for (let br = 0; br < 3; br++) {
+    const col = el('div', 'sk-col', `<h4>${BRANCHES[p.cls][br]}</h4>`);
+    for (let tier = 1; tier <= 3; tier++) {
+      const id = Object.keys(SKILLS).find(k => SKILLS[k].cls === p.cls && SKILLS[k].branch === br && SKILLS[k].tier === tier); if (!id) continue; const S = SKILLS[id], r = p.skills[id] || 0;
+      const prev = tier > 1 ? Object.keys(SKILLS).find(k => SKILLS[k].cls === p.cls && SKILLS[k].branch === br && SKILLS[k].tier === tier - 1) : null, locked = (prev && !(p.skills[prev] > 0)) || p.lvl < S.req, eq = isEquipped(id);
+      const node = el('div', 'sk-node' + (r ? ' learned' : '') + (locked && !r ? ' locked' : '') + (eq ? ' equipped' : ''));
+      node.innerHTML = `<div class="sk-ic">${S.icon}</div><div class="sk-tx"><div class="sk-n">${S.name} <span class="tb ${S.type}">${SKILL_TYPE_LABEL[S.type]}</span></div><div class="sk-d">${S.desc.replace('{v}', `<b>${S.v[Math.max(0, r - 1)]}</b>`)}</div>${r < 3 ? `<div class="sk-next">След. ранг: ${S.v[r]}${S.cost ? ` · ${RES[C.res].name}: ${S.cost}` : ''}${S.cd ? ` · КД ${S.cd} с` : ''}</div>` : '<div class="sk-next">Максимальный ранг</div>'}<div class="sk-meta"><span class="pips">${[0, 1, 2].map(i => `<i class="${i < r ? 'on' : ''}"></i>`).join('')}</span> · ур. ${S.req}${locked && !r ? ' 🔒' : ''}</div></div>`;
+      const add = el('button', 'sk-add', '+'); add.title = 'Изучить / улучшить'; add.disabled = r >= 3 || p.sp < 1 || locked; add.onclick = () => learnSkill(id); node.appendChild(add);
+      if (r) { const e = el('button', 'sk-equip' + (eq ? ' on' : ''), eq ? '✔ Экипировано' : 'Экипировать'); e.onclick = () => toggleEquip(id); node.appendChild(e); }
+      col.appendChild(node); if (tier < 3) col.appendChild(el('div', 'sk-arrow', '▼'));
+    }
+    cols.appendChild(col);
+  }
+  const ra = RACES[p.race].active; b.appendChild(el('div', 'sk-race', `<b>${RACES[p.race].icon} Расовая способность:</b> ${ra.icon} ${ra.name} (F) — ${ra.desc}`));
+};

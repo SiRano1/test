@@ -7,15 +7,6 @@ const FORM_ATK = {
 };
 const FORM_LOOK = { wolf: { kind: 'quad', id: 'wolf', col: '#6a6e78', acc: '#c8ccd4', size: 0.85 }, bear: { kind: 'quad', id: 'bear', col: '#6a4630', acc: '#b89060', size: 1.15 }, eagle: { kind: 'bird', id: 'eagle', col: '#7a5a34', acc: '#f4f0e0', size: 0.95 } };
 
-/* ---- эффекты ---- */
-function floatText(x, y, text, color, size) { if (!G.settings.dmgNumbers && size !== 'big' && !/[A-Za-zА-Яа-я+]/.test(String(text))) return; G.texts.push({ x: x + rand(-8, 8), y, text, color: color || '#fff', t: 0, life: 1.1, size: size || 'n' }); }
-function burst(x, y, color, n = 10, spread = 60) { if (!G.settings.particles) n = Math.ceil(n / 3); for (let i = 0; i < n; i++) { const a = rand(0, TAU), s = rand(spread * 0.3, spread); G.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 20, life: rand(0.3, 0.7), t: 0, color, size: rand(2, 4), g: 80 }); } }
-function ringFx(x, y, color, r, life = 0.45) { G.fx.push({ ring: true, x, y, color, r, t: 0, life }); }
-function slashFx(x, y, ang, range, arc, color) { G.fx.push({ slash: true, x, y, ang, range, arc, color: color || '#fff', t: 0, life: 0.18 }); }
-function shake(a, t = 0.25) { if (G.settings.shake) { G.shakeA = Math.max(G.shakeA * (G.shakeT > 0 ? 1 : 0), a); G.shakeT = t; } }
-function later(sec, fn) { G.timers.push({ at: G.t + sec, fn }); }
-function lightning(pts) { G.lightning.push({ pts, t: 0, life: 0.25 }); }
-
 /* ---- перемещение с коллизиями ---- */
 function blockedPx(px, py, fly) {
   const tx = Math.floor(px / TS), ty = Math.floor(py / TS);
@@ -55,7 +46,8 @@ function hurtPlayer(raw, src, opts = {}) {
   if (!opts.noDodge && Math.random() < S.dodge) { floatText(P.x, P.y - 50, 'Уклон', '#8cf'); return 0; }
   let d = raw * 50 / (50 + S.def); d *= (1 - S.dr); d = Math.max(1, Math.round(d));
   if (P.shield > 0) { const a = Math.min(P.shield, d); P.shield -= a; d -= a; floatText(P.x, P.y - 46, 'Щит', '#8cf'); }
-  if (d > 0) { P.hp -= d; floatText(P.x, P.y - 50, `-${d}`, '#f66', d > P.maxHp * 0.25 ? 'big' : 'n'); P.hurt = 0.2; Snd.play('hurt'); if (d > P.maxHp * 0.2) shake(4, 0.2); }
+  if (d > 0) { P.hp -= d; floatText(P.x, P.y - 50, `-${d}`, '#f66', d > P.maxHp * 0.25 ? 'big' : 'n'); P.hurt = 0.2; spark(P.x, P.y - 16, src ? Math.atan2(P.y - src.y, P.x - src.x) : -1.5, '#ff5040', 7); fxFlare(P.x, P.y - 16, '#ff6050', 20, 0.16); hitstop(d > P.maxHp * 0.15 ? 0.06 : 0.025); Snd.play('hurt'); if (d > P.maxHp * 0.2) shake(4, 0.2); }
+  if (src && src.hp !== undefined && !src.dead) { if (P.thornsUntil > G.t) damageMon(src, raw * P.thornsPct, { dot: true }); if (P.frostUntil > G.t) { src.slow = G.t + 2; src.slowAmt = 0.5; } }
   P.lastCombat = G.t; if (G.prof.cls === 'berserk') P.res = Math.min(P.maxRes, P.res + 4 + d * 0.1);
   if (P.stealth > G.t && !opts.keepStealth) { P.stealth = 0; }
   if (P.hp <= 0) killPlayer();
@@ -91,6 +83,7 @@ function damageMon(m, amount, o = {}) {
   if (G_DEV.onehit && G.settings.dev && !o.dot) d = 1e9; d = Math.max(1, Math.round(d));
   m.hp -= d; m.hurt = 0.15; m.lastHit = G.t; P.lastCombat = G.t; m.aggroed = true;
   if (m.state === 'idle') m.state = 'chase'; G.target = m; G.targetT = G.t;
+  if (!o.dot) hitImpact(m, d, o);
   floatText(m.x, m.y - 30 * m.d.size - 16, o.crit ? `${d}!` : `${d}`, o.crit ? '#ffd23a' : (o.dot ? '#b8f' : '#fff'), o.crit ? 'big' : 'n');
   if (!o.dot) { Snd.play('hit'); burst(m.x, m.y - 12, o.crit ? '#ffd23a' : '#c33', o.crit ? 8 : 4, 50); }
   if (o.kb && !m.boss) { const a = Math.atan2(m.y - P.y, m.x - P.x); moveEntity(m, Math.cos(a) * o.kb, Math.sin(a) * o.kb, mRad(m)); }
@@ -106,17 +99,18 @@ function damageMon(m, amount, o = {}) {
 }
 function killMon(m) {
   if (m.dead) return; m.dead = true; m.deadT = 0; m.hp = 0; const d = m.d, p = G.prof, S = G.S;
-  p.kills++; Snd.play('die');
+  p.kills++; Snd.play('die'); deathFx(m);
   let xp = d.xp * (1 + (m.lvl - d.lvl[0]) * 0.2) * clamp(1 - (p.lvl - m.lvl) * 0.12, 0.2, 1.6);
   if (G.events.wolfnight && (m.id === 'wolf' || m.id === 'direwolf')) xp *= 2;
   gainXp(xp);
-  const gold = Math.round(rand(d.gold[0], d.gold[1]) * (1 + (m.lvl - d.lvl[0]) * 0.15) * S.gold * (m.event === 'raid' ? 1.5 : 1)); if (gold > 0) { addGold(gold); floatText(m.x, m.y - 40, `+${gold}💰`, '#fd4'); Snd.play('coin'); }
+  const gold = Math.round(rand(d.gold[0], d.gold[1]) * (1 + (m.lvl - d.lvl[0]) * 0.15) * S.gold * (m.event === 'raid' ? 1.5 : 1)); if (gold > 0 && !m.boss) { addGold(gold); floatText(m.x, m.y - 40, `+${gold}💰`, '#fd4'); Snd.play('coin'); }
+  const bossLoot = [];
   const luck = S.luck; for (const [id, ch] of d.drops) {
     if (id === 'sigil' && !questActive('mq3')) continue; if (id === 'ember' && !questActive('mq5')) continue;
-    if (Math.random() < Math.min(1, ch * (ch >= 1 ? 1 : luck))) addItem(id, 1);
+    if (Math.random() < Math.min(1, ch * (ch >= 1 ? 1 : luck))) { if (m.boss && !['sigil', 'ember'].includes(id)) bossLoot.push([id, id === 'gem' ? randi(1, 3) : 1]); else addItem(id, 1); }
   }
   const b = p.bestiary[m.id] || (p.bestiary[m.id] = { kills: 0 }); const first = b.kills === 0; b.kills++; if (first) { toast(`📖 Бестиарий: ${d.name}`, 'good'); logMsg(`Запись в бестиарии: ${d.name}`, 'good'); }
-  if (m.boss) { const key = m.sp.boss, first = key && !p.defeated.includes(key); if (key && first) p.defeated.push(key); if (d.loot) { const wt = `w_${CLASSES[p.cls].weapon}_3`; if (first || Math.random() < 0.3) { addItem(wt, 1); toast(`🏆 Трофей босса: ${ITEMS[wt].name}`, 'good'); } } toast(`Победа: ${d.name}!`, 'good'); shake(8, 0.5); burst(m.x, m.y - 20, '#ffd23a', 40, 120); ringFx(m.x, m.y, '#ffd23a', 120, 0.6); Snd.play('levelup'); }
+  if (m.boss) { const key = m.sp.boss, first = key && !p.defeated.includes(key); if (key && first) p.defeated.push(key); if (d.loot) { const C = CLASSES[p.cls], wt = `w_${C.weapon}_3`; if (first || Math.random() < 0.3) bossLoot.push([wt, 1]); const at = pick(C.armor), sl = pick(['body', 'head', 'boots']); if (first || Math.random() < 0.4) bossLoot.push([`a_${at}_${sl}_${d.lvl[0] >= 12 ? 3 : 2}`, 1]); bossLoot.push(['hp_2', 2], ['rs_2', 1]); } spawnBossChest(m, bossLoot, Math.round(gold * 3)); toast(`Победа: ${d.name}! Из тела босса выпал сундук`, 'good'); shake(8, 0.5); burst(m.x, m.y - 20, '#ffd23a', 40, 120); ringFx(m.x, m.y, '#ffd23a', 120, 0.6); Snd.play('levelup'); }
   questKill(m.id); bountyKill(m.id); if (m.boss) questBoss(m.id);
   if (m.elite) { addGold(Math.round(gold * 2)); if (Math.random() < 0.4) addItem('gem', 1); gainXp(xp); floatText(m.x, m.y - 60, 'Вожак повержен!', '#fd4', 'big'); }
   if (m.event === 'raid' && G.raid) G.raid.killed++; if (m.event === 'tourney' && G.tourney) tourneyCheck();
@@ -142,7 +136,8 @@ function updateProj(dt) {
     const pr = G.proj[i]; pr.t += dt; let dead = pr.t > pr.life;
     const nx = pr.x + pr.vx * dt, ny = pr.y + pr.vy * dt;
     if (blockedPx(nx, ny, true) || (G.world.blk[Math.floor(ny / TS) * WW + Math.floor(nx / TS)] && !pr.fly)) { dead = true; if (pr.team === 'p' && pr.aoe) { pr.x = nx; pr.y = ny; } } else { pr.x = nx; pr.y = ny; }
-    if (pr.trail !== false && Math.random() < 0.6 && G.settings.particles) G.fx.push({ x: pr.x, y: pr.y, vx: rand(-10, 10), vy: rand(-10, 10), life: 0.25, t: 0, color: pr.color, size: pr.arrow ? 1.5 : 3, g: 0 });
+    pr.tp = pr.tp || []; pr.tp.push([pr.x, pr.y]); if (pr.tp.length > (pr.arrow ? 4 : 9)) pr.tp.shift(); if (pr.aoe && pr.team === 'p' && Math.random() < 0.7) { P_({ x: pr.x + rand(-4, 4), y: pr.y + rand(-4, 4), vx: rand(-15, 15), vy: rand(-30, -5), life: rand(0.3, 0.6), color: '#ffa040', size: rand(2, 4), shape: 'circle', add: true }); if (Math.random() < 0.4) P_({ x: pr.x, y: pr.y, vx: 0, vy: -10, life: 0.6, color: '#443', size: 5, shape: 'smoke', grow: 12, alpha0: 0.35 }); }
+    if (false && pr.trail !== false && Math.random() < 0.6 && G.settings.particles) G.fx.push({ x: pr.x, y: pr.y, vx: rand(-10, 10), vy: rand(-10, 10), life: 0.25, t: 0, color: pr.color, size: pr.arrow ? 1.5 : 3, g: 0 });
     if (!dead) {
       if (pr.team === 'p') {
         for (const m of enemies()) {
@@ -180,7 +175,7 @@ function updatePlayer(dt) {
   if (P.dash) {
     const d = P.dash; d.t += dt; const sp = d.dist / d.dur * dt, ox = P.x, oy = P.y; moveEntity(P, Math.cos(d.ang) * sp, Math.sin(d.ang) * sp, 8, fly);
     if (d.hitMult) for (const m of enemies()) { if (!d.hit.has(m) && Math.hypot(m.x - P.x, m.y - P.y) < 34 + mRad(m)) { d.hit.add(m); const h = calcHit(d.hitMult); damageMon(m, h.d, { crit: h.crit, kb: 30, melee: true, rage: 8 }); } }
-    if (Math.hypot(P.x - ox, P.y - oy) < 0.1 * sp) d.t = d.dur; if (d.t >= d.dur) P.dash = null; P.moving = true;
+    if (Math.hypot(P.x - ox, P.y - oy) < 0.1 * sp) d.t = d.dur; if (d.t >= d.dur) { P.dash = null; d.onEnd && d.onEnd(); } P.moving = true;
     if (G.settings.particles && Math.random() < 0.7) G.fx.push({ x: P.x, y: P.y - 10, vx: 0, vy: 0, life: 0.3, t: 0, color: d.color || '#fff', size: 5, g: 0 });
   } else if (P.anim && P.anim.kind === 'spin') { P.moving = false; }
   else {
@@ -197,7 +192,7 @@ function updatePlayer(dt) {
   else { let rg = S.regen * (G.prof.cls === 'mage' && !inCombat ? 2 : 1); if (P.form) rg = 0; P.res = Math.min(P.maxRes, P.res + rg * dt); }
   P.hp = Math.min(P.maxHp, P.hp + (inCombat ? S.hpRegen * 0.3 : S.hpRegen + P.maxHp * 0.02) * dt);
   if (P.hot) { const a = Math.min(P.hot.left, P.hot.rate * dt); P.hp = Math.min(P.maxHp, P.hp + a); P.hot.left -= a; if (P.hot.left <= 0.01 || G.t > P.hot.until) P.hot = null; if (Math.random() < 0.15) burst(P.x, P.y - 14, '#5f5', 1, 20); }
-  if (P.form) { const drain = { wolf: 1, bear: 1.5, eagle: 1.2 }[P.form]; P.res -= drain * dt; if (P.res <= 0) { P.res = 0; setForm(null); toast('Мана иссякла — вы вернулись в облик человека', 'warn'); } }
+  if (P.form) { const drain = { wolf: 1, bear: 1.5, eagle: 1.2 }[P.form]; P.res -= drain * (G.S.formDrain || 1) * dt; if (P.res <= 0) { P.res = 0; setForm(null); toast('Мана иссякла — вы вернулись в облик человека', 'warn'); } }
   for (let i = P.dots.length - 1; i >= 0; i--) { const d = P.dots[i]; d.tick -= dt; if (d.tick <= 0) { d.tick = 0.5; hurtPlayer(d.dps * 0.5, null, { noDodge: true, keepStealth: true }); } if (G.t > d.until) P.dots.splice(i, 1); }
   if (P.buffs.some(b => b.until < G.t)) { recalc(); UI.dirty = true; }
   if (P.shield > 0 && G.t > P.shieldUntil) P.shield = 0;
@@ -212,15 +207,15 @@ function basicAttack() {
     const kind = P.form ? A.anim : (p.cls === 'assassin' ? 'stab' : 'slash'), dur = Math.max(0.22, cd * 0.85);
     Snd.play('swing');
     startAnim(kind, dur, 0.4, () => {
-      const ang = P.aim, ox = P.x, oy = P.y - 12; slashFx(ox, oy, ang, rng, A.arc, p.cls === 'assassin' ? '#dfe' : '#fff'); let n = 0;
+      const ang = P.aim, ox = P.x, oy = P.y - 12; meleeFx(P, ox, oy, ang, rng, A); let n = 0;
       for (const m of enemies()) { const dx = m.x - ox, dy = (m.y - 12 * m.d.size) - oy, d = Math.hypot(dx, dy); if (d < rng + mRad(m) && Math.abs(angDiff(Math.atan2(dy, dx), ang)) < A.arc / 2) { const h = calcHit(A.mult, { critBonus: stealthy ? 1 : 0 }); damageMon(m, h.d, { crit: h.crit, melee: true, kb: A.kb || 6, rage: A.rage !== undefined ? A.rage : 4 }); n++; if (!P.form && p.cls !== 'berserk') { } } }
       if (n && stealthy) P.stealth = 0; if (n) shake(P.form === 'bear' ? 3 : 1.5, 0.1);
     });
   } else {
     const isBow = p.cls === 'hunter', isBolt = p.cls === 'mage';
-    Snd.play(isBow ? 'bow' : 'cast');
+    Snd.play(isBow ? 'bow' : 'cast'); if (isBolt) fxCircle(P.x, P.y, 24, '#b58cff', 0.55);
     startAnim(isBow ? 'shoot' : 'cast', Math.max(0.25, cd * 0.8), isBow ? 0.5 : 0.45, () => {
-      const a = P.aim; fireProj({ x: P.x + Math.cos(a) * 14, y: P.y - 16 + Math.sin(a) * 6, ang: a, speed: C.atk.speed, r: C.atk.r, mult: C.atk.mult, color: C.atk.color, arrow: C.atk.arrow, life: rng / C.atk.speed, light: isBolt ? 90 : 0, hitOpts: { critBonus: stealthy ? 1 : 0 } });
+      const a = P.aim; fireProj({ x: P.x + Math.cos(a) * 14, y: P.y - 16 + Math.sin(a) * 6, ang: a, speed: C.atk.speed, r: C.atk.r, mult: C.atk.mult, color: C.atk.color, arrow: C.atk.arrow, life: rng / C.atk.speed, light: isBolt ? 90 : 0, hitOpts: { critBonus: stealthy ? 1 : 0 } }); fxFlare(P.x + Math.cos(a) * 16, P.y - 18, isBolt ? '#d8b8ff' : '#ffffff', isBolt ? 26 : 14, 0.14); if (isBow) fxStreak(P.x + Math.cos(a) * 14, P.y - 16, a, 40, '#fff', 0.1, 2); else spark(P.x + Math.cos(a) * 16, P.y - 18, a, '#c8a0ff', 5, 120);
     });
   }
 }
@@ -228,7 +223,7 @@ function basicAttack() {
 /* ---- форма друида ---- */
 function setForm(id, silent) {
   const P = G.P; if (P.form === id) return; P.form = id; P.anim = null;
-  if (!silent) { Snd.play('transform'); burst(P.x, P.y - 14, id ? '#6c6' : '#fff', 22, 70); ringFx(P.x, P.y, '#6c6', 50); }
+  if (!silent) { Snd.play('transform'); burst(P.x, P.y - 14, id ? '#6c6' : '#fff', 22, 70); ringFx(P.x, P.y, '#6c6', 50); fxLeaves(P.x, P.y - 14, 16, 70); fxSmoke(P.x, P.y - 10, 8, '#cfc', 18, 0.9, 20); fxFlare(P.x, P.y - 14, '#e8ffd0', 46, 0.3); fxCircle(P.x, P.y, 34, '#8f8', 0.6); }
   recalc(); UI.dirty = true;
 }
 
@@ -273,11 +268,11 @@ function castSkill(id) {
 function useRacial() {
   const P = G.P, R = RACES[G.prof.race], a = R.active; if (P.dead || (G.cd[a.id] || 0) > G.t) return; G.cd[a.id] = G.t + a.cd;
   switch (a.id) {
-    case 'secondwind': P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.3); floatText(P.x, P.y - 50, '+30%', '#5f5'); burst(P.x, P.y - 14, '#f8a', 14, 50); Snd.play('heal'); break;
-    case 'moonstep': addBuff('moonstep', 'Лунный шаг', '🌙', { spdPct: 0.5, dodge: 0.25 }, 6); burst(P.x, P.y - 14, '#bdf', 16, 60); Snd.play('cast'); break;
-    case 'stoneskin': addBuff('stoneskin', 'Каменная кожа', '🪨', { dr: 0.4 }, 7); burst(P.x, P.y - 14, '#aaa', 16, 50); Snd.play('cast'); break;
-    case 'bloodrage': addBuff('bloodrage', 'Кровавая ярость', '💢', { dmgPct: 0.4, atkSpdPct: 0.3 }, 8); burst(P.x, P.y - 14, '#f44', 20, 70); Snd.play('roar'); break;
-    case 'slip': P.stealth = G.t + 5; addBuff('slip', 'Ловкач', '💨', { spdPct: 0.3 }, 5); burst(P.x, P.y - 14, '#ddd', 16, 50); Snd.play('whoosh'); for (const m of enemies()) if (m.state === 'chase') { m.state = 'idle'; m.aggroed = false; } break;
+    case 'secondwind': P.hp = Math.min(P.maxHp, P.hp + P.maxHp * 0.3); floatText(P.x, P.y - 50, '+30%', '#5f5'); burst(P.x, P.y - 14, '#f8a', 14, 50); Snd.play('heal'); fxCircle(P.x, P.y, 40, '#f8a', 0.8); fxPillar(P.x, P.y, 'rgba(255,150,190,0.8)', 0.8, 130, 34); for (let i = 0; i < 6; i++) P_({ x: P.x + rand(-14, 14), y: P.y - 10, vx: 0, vy: rand(-50, -25), life: 1, color: '#ff8ab0', size: 14, shape: 'text', text: '💗', force: true }); break;
+    case 'moonstep': addBuff('moonstep', 'Лунный шаг', '🌙', { spdPct: 0.5, dodge: 0.25 }, 6); burst(P.x, P.y - 14, '#bdf', 16, 60, { add: true }); Snd.play('cast'); fxCircle(P.x, P.y, 40, '#bdf', 0.7); fxFlare(P.x, P.y - 16, '#dfe8ff', 44, 0.3); break;
+    case 'stoneskin': addBuff('stoneskin', 'Каменная кожа', '🪨', { dr: 0.4 }, 7); burst(P.x, P.y - 14, '#aaa', 16, 50); Snd.play('cast'); fxDebris(P.x, P.y - 10, 12, '#8a8a8a', 120); fxCircle(P.x, P.y, 36, '#aaa', 0.7); ringFx(P.x, P.y, '#bbb', 60, 0.4); break;
+    case 'bloodrage': addBuff('bloodrage', 'Кровавая ярость', '💢', { dmgPct: 0.4, atkSpdPct: 0.3 }, 8); burst(P.x, P.y - 14, '#f44', 20, 70, { add: true }); Snd.play('roar'); fxPillar(P.x, P.y, 'rgba(255,40,20,0.85)', 0.8, 150, 40); fxFlash('#ff2010', 0.2, 0.3); ringFx(P.x, P.y, '#f44', 90, 0.5); shake(3, 0.2); break;
+    case 'slip': P.stealth = G.t + 5; addBuff('slip', 'Ловкач', '💨', { spdPct: 0.3 }, 5); burst(P.x, P.y - 14, '#ddd', 16, 50); fxSmoke(P.x, P.y - 12, 12, '#ccc', 22, 1.2, 30); Snd.play('whoosh'); for (const m of enemies()) if (m.state === 'chase') { m.state = 'idle'; m.aggroed = false; } break;
   }
 }
 
@@ -371,7 +366,7 @@ function updateMonster(m, dt) {
       if (dist > reach * 0.85 && !rooted && !m.atk) { moveEntity(m, Math.cos(ang) * spd * dt, Math.sin(ang) * spd * dt, mRad(m)); m.moving = true; }
       if (dist < reach && m.cd <= 0 && !m.atk && !rooted) {
         m.cd = d.cd * rand(0.9, 1.15); m.atk = { p: 0, dur: 0.5, hitAt: 0.55, done: false, kind: 'slash', fn: () => {
-          if (m.dead || m.stun > G.t) return; const t2 = tgt === G.petEnt ? G.petEnt : G.P; const dd = Math.hypot(t2.x - m.x, t2.y - m.y);
+          if (m.dead || m.stun > G.t) return; monsterSwingFx(m, tgt); const t2 = tgt === G.petEnt ? G.petEnt : G.P; const dd = Math.hypot(t2.x - m.x, t2.y - m.y);
           if (dd < reach * 1.35) { if (t2 === G.P) { hurtPlayer(m.dmg * rand(0.9, 1.1), m); if (d.poison && Math.random() < 0.6) G.P.dots.push({ dps: m.dmg * 0.25, until: G.t + 4, tick: 0 }); if (m.boss) shake(4, 0.2); } else { t2.hp -= m.dmg; petHurt(t2); floatText(t2.x, t2.y - 30, `-${Math.round(m.dmg)}`, '#f66'); } }
         } };
       }
@@ -406,4 +401,58 @@ function updateAreas(dt) {
       if (m) { explode(a.x, a.y, 70, a.mult, { color: '#ca8', dmgOpts: { root: 3 } }); G.areas.splice(i, 1); }
     }
   }
+}
+
+/* ---- сундук с добычей босса ---- */
+function spawnBossChest(m, loot, gold) {
+  const w = G.world, tx = Math.floor(m.x / TS), ty = Math.floor(m.y / TS); let q = w.walk(tx, ty) ? [tx, ty] : w.nearestWalk(tx, ty) || [tx, ty];
+  const id = 'boss_' + Date.now().toString(36) + Math.floor(Math.random() * 99);
+  const o = { t: 'chest', tx: q[0], ty: q[1], x: q[0] * TS + TS / 2, y: q[1] * TS + TS - 2, v: 0, id, loot, gold, boss: true, light: 90 };
+  w.objs.push(o); w.lights.push({ x: o.x, y: o.y - 20, r: 90, noglow: false });
+  G.prof.bossChests = G.prof.bossChests || []; G.prof.bossChests.push({ id, tx: q[0], ty: q[1], loot, gold });
+  burst(o.x, o.y - 16, '#ffd23a', 30, 100, { add: true }); ringFx(o.x, o.y, '#ffd23a', 60, 0.6);
+}
+function restoreBossChests() {
+  const w = G.world; w.objs = w.objs.filter(o => !o.boss); (G.prof.bossChests || []).forEach(c => { if (G.opened.has(c.id)) return; w.objs.push({ t: 'chest', tx: c.tx, ty: c.ty, x: c.tx * TS + TS / 2, y: c.ty * TS + TS - 2, v: 0, id: c.id, loot: c.loot, gold: c.gold, boss: true }); });
+}
+
+/* ---- эффекты ближнего боя, попаданий, смерти ---- */
+function meleeFx(P, ox, oy, ang, rng, A) {
+  const cls = G.prof.cls, f = P.form, cx = ox + Math.cos(ang) * rng * 0.55, cy = oy + Math.sin(ang) * rng * 0.55;
+  if (f === 'wolf') { fxClaws(cx, cy, ang, rng * 0.9, '#e8f0ff', 3); }
+  else if (f === 'bear') { fxClaws(cx, cy, ang, rng * 1.1, '#ff9a7a', 3); fxDust(P.x + Math.cos(ang) * 30, P.y, 5, '#a98', 7); shake(2, 0.1); }
+  else if (f === 'eagle') { fxCrescent(ox, oy, ang, rng, A.arc, '#dff', '#8cf', 0.22, 0.3); fxSpeedLines(P.x, P.y - 20, ang, 4); }
+  else if (cls === 'berserk') { fxCrescent(ox, oy, ang, rng * 1.08, A.arc, '#ffe6a8', '#ff4a20', 0.26, 0.55); fxDust(P.x + Math.cos(ang) * 22, P.y, 3, '#a98', 6); fxStreak(ox, oy, ang, rng * 1.1, '#fff', 0.12, 3); }
+  else if (cls === 'assassin') { P.alt = (P.alt || 0) ^ 1; fxCross(cx, cy, ang + (P.alt ? 0.25 : -0.25), rng * 0.75, '#c890ff', '#ffffff'); fxStreak(ox, oy, ang, rng, '#e8d0ff', 0.1, 2); }
+  else if (cls === 'druid') { fxCrescent(ox, oy, ang, rng, A.arc, '#d8ffc0', '#3fa84a', 0.22, 0.42); fxLeaves(cx, cy, 4, 30); }
+  else slashFx(ox, oy, ang, rng, A.arc, '#fff');
+}
+function hitCol(m) { const k = m.d.kind; return k === 'skeleton' ? '#e8e0c8' : k === 'blob' ? '#7f7' : k === 'ghost' ? '#9df' : k === 'golem' ? '#ff9a3a' : k === 'spider' ? '#9c6' : '#c83030'; }
+function hitImpact(m, d, o) {
+  const P = G.P, ang = Math.atan2(m.y - P.y, m.x - P.x), y = m.y - 14 * m.d.size, col = hitCol(m);
+  spark(m.x, y, ang, o.crit ? '#ffe27a' : '#ffffff', o.crit ? 10 : 5, o.crit ? 260 : 190);
+  burst(m.x, y, col, o.crit ? 8 : 4, 60, { shape: 'circle' });
+  if (o.crit) { fxFlare(m.x, y, '#ffe27a', 36, 0.24); ringFx(m.x, m.y - 6, '#ffe27a', 34, 0.25); hitstop(0.06); punch(0.025); }
+  else if (o.melee || o.pet) { fxFlare(m.x, y, '#fff', 16, 0.14); if (o.melee) hitstop(0.03); }
+  if (!o.pet && !m.boss) m.kick = { x: Math.cos(ang) * (o.crit ? 12 : 7), y: Math.sin(ang) * 4, at: G.at };
+  if (d > m.maxHp * 0.15 && !m.boss) { m.kick.x *= 1.6; shake(2.5, 0.1); }
+}
+function monsterSwingFx(m, tgt) {
+  const t2 = tgt || G.P, ang = Math.atan2(t2.y - 10 - (m.y - 14), t2.x - m.x), k = m.d.kind, sz = m.d.size, cx = m.x + Math.cos(ang) * 26 * sz, cy = m.y - 14 * sz + Math.sin(ang) * 10;
+  if (k === 'quad' || k === 'bird' || k === 'dragon') fxClaws(cx, cy, ang, 34 * sz, k === 'dragon' ? '#ffb040' : '#ffc0b0', 3);
+  else if (k === 'spider') { burst(cx, cy, '#9c6', 8, 60, { shape: 'circle' }); fxClaws(cx, cy, ang, 26, '#b8e090', 2); }
+  else if (k === 'blob') { burst(cx, cy, m.d.col, 8, 70, { shape: 'circle' }); }
+  else fxCrescent(m.x, m.y - 16 * sz, ang, 44 * sz, 1.9, '#ffd0c0', m.boss ? '#ff2a10' : '#ff6a4a', 0.2, 0.45);
+  if (sz >= 1.4) { fxDust(m.x + Math.cos(ang) * 30 * sz, m.y, 6, '#a98', 8); shake(3, 0.12); }
+}
+function deathFx(m) {
+  const k = m.d.kind, x = m.x, y = m.y - 12 * m.d.size, big = m.d.size >= 1.4;
+  if (k === 'skeleton') { fxDebris(x, y, 14, '#e8e0c8', 170); fxDust(x, m.y, 8, '#c8c0a8'); }
+  else if (k === 'blob') { burst(x, y, m.d.col, 20, 120, { shape: 'circle' }); fxPuddle(x, m.y, 26, m.d.col); }
+  else if (k === 'ghost') { for (let i = 0; i < 10; i++) P_({ x: x + rand(-8, 8), y: y + rand(-8, 8), vx: rand(-15, 15), vy: rand(-90, -40), life: rand(0.6, 1.1), color: '#bef', size: rand(3, 6), shape: 'circle', add: true }); ringFx(x, m.y, '#9df', 40, 0.5); }
+  else if (k === 'golem') { fxDebris(x, y, 16, '#4a4444', 200); fxEmbers(x, y, 14, 30); fxDust(x, m.y, 10, '#666'); shake(4, 0.25); }
+  else if (k === 'human') { fxDust(x, m.y, 8, '#b8a888'); burst(x, y, '#a02828', 10, 90, { shape: 'circle' }); }
+  else { fxDust(x, m.y, 8, '#c8b8a0'); burst(x, y, m.d.col, 12, 90); }
+  if (m.elite) { fxFlare(x, y, '#ffd23a', 50, 0.35); ringFx(x, m.y, '#ffd23a', 70, 0.5); }
+  if (m.boss) { fxFlash('#ffffff', 0.7, 0.4); hitstop(0.22); G.slowmo = 1.0; punch(0.08); for (let i = 0; i < 4; i++) later(i * 0.15, () => { ringFx(x, m.y, ['#ffd23a', '#ff8a3a', '#fff', '#ffd23a'][i], 80 + i * 45, 0.7); fxEmbers(x, y, 14, 60, '#ffd23a'); }); fxCracks(x, m.y, 120, 6); fxDebris(x, y, 20, '#8a7a6a', 240); fxPillar(x, m.y, 'rgba(255,230,140,0.9)', 1.2, 320, 60); }
 }

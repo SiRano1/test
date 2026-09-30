@@ -136,7 +136,7 @@ function sellPrice(it) {
 function usePortal(o) {
   const P = G.P; if (G.fish) G.fish = null;
   UI.fade(() => {
-    const d = o.dest; P.x = (d[0] + 0.5) * TS; P.y = (d[1] + 1) * TS - 6; G.cam.x = P.x - innerWidth / G.cam.zoom / 2; G.cam.y = P.y - innerHeight / G.cam.zoom / 2;
+    let d = o.dest; if (!G.world.walk(d[0], d[1])) { const q = G.world.nearestWalk(d[0], d[1]); if (q) d = q; } P.x = (d[0] + 0.5) * TS; P.y = (d[1] + 1) * TS - 6; G.cam.x = P.x - innerWidth / G.cam.zoom / 2; G.cam.y = P.y - innerHeight / G.cam.zoom / 2;
     if (G.petEnt) { G.petEnt.x = P.x - 20; G.petEnt.y = P.y; G.petEnt.target = null; } G.proj = []; G.areas = [];
     if (!o.exit) { UI.banner(`🕳️ ${o.label}`, `Подземелье · рекомендуемый уровень ${o.lvl}`); Snd.play('roar'); } else Snd.play('whoosh');
   });
@@ -170,4 +170,14 @@ function tutUpdate() {
   const f = G.prof.flags; if (f.tut >= 6) return; const P = G.P;
   if ((f.tut === 3 || f.tut === 4) && !G.prof.inv.some(s => ITEMS[s.id].type === 'seed') && !Object.keys(G.prof.farm).length) { addItem('seed_carrot', 3, true); }
   if (f.tut >= 5 && isSafeTile(P.x / TS, P.y / TS) && P.x / TS > 34 && P.x / TS < 66 && P.y / TS > 33 && P.y / TS < 64) { f.tut = 6; UI.banner('🏰 Эльдергард', 'Найдите мэра Маррена на площади — над его головой светится «?»'); UI.dirty = true; }
+}
+
+/* ---------- Защита от застревания ---------- */
+function unstuck(force) {
+  const P = G.P, fly = P.form === 'eagle' || (G_DEV.fly && G.settings.dev);
+  if (!force && (fly || !blockedPx(P.x - 6, P.y - 2, false) && !blockedPx(P.x + 6, P.y - 2, false) && !blockedPx(P.x, P.y - 2, false))) return false;
+  const tx = Math.floor(P.x / TS), ty = Math.floor((P.y - 2) / TS); let q = null;
+  for (let r = 0; r < 12 && !q; r++) for (let dy = -r; dy <= r && !q; dy++) for (let dx = -r; dx <= r; dx++) { if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = tx + dx, y = ty + dy; if (G.world.walk(x, y) && !blockedPx((x + 0.5) * TS, (y + 1) * TS - 6, false) && zoneBlock((x + 0.5) * TS, (y + 1) * TS) === zoneBlock(P.x, P.y)) { q = [x, y]; break; } }
+  if (!q) q = [50, 52];
+  P.x = (q[0] + 0.5) * TS; P.y = (q[1] + 1) * TS - 6; P.dash = null; if (G.petEnt) { G.petEnt.x = P.x; G.petEnt.y = P.y; } if (force) toast('Вы освободились', 'good'); return true;
 }
