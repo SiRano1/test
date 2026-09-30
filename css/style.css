@@ -178,3 +178,7 @@ input:checked+.switch{background:#6a8a2a}input:checked+.switch:after{left:25px;b
 #h-tut .tut-h{color:#ffe066;font-size:12px;letter-spacing:1px}#h-tut .tut-t{font-size:16px;margin:3px 0}
 #tut-skip{background:none;border:none;color:#a8977a;font-size:11px;text-decoration:underline}
 .letter{max-width:660px;text-align:left;font-size:16px;background:linear-gradient(#efe0b0,#d8c288);color:#3a2a10;border-color:#7a5a20}.letter .st-title{color:#5a2a10;text-align:center}.letter .btn{margin:auto}
+.devbox{position:fixed;right:10px;top:10px;width:380px;max-height:92vh;overflow:auto;z-index:300;background:rgba(10,20,30,.95);border:2px solid #4fd;border-radius:8px;padding:8px;font-size:12px;user-select:none}
+.dvh{color:#4fd;font-size:14px;margin-bottom:4px}.dvh i{color:#8a9;font-size:11px}.dvrow{display:flex;flex-wrap:wrap;gap:4px;align-items:center;margin:4px 0}.dvrow b{width:64px;color:#9cf}
+.dvb{background:#134;color:#cfe;border:1px solid #4fd;border-radius:4px;padding:3px 7px;font-size:12px}.dvb:hover{background:#256}.dvb.on{background:#2a6;color:#fff}
+.devbox select{max-width:190px;font-size:12px;padding:2px}

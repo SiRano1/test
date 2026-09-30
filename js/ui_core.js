@@ -144,7 +144,7 @@ const UI = {
     sec('🔊 Звук'); slider('Общая громкость', 'master', 0, 1, 0.05); slider('Музыка', 'music', 0, 1, 0.05); slider('Звуковые эффекты', 'sfx', 0, 1, 0.05);
     sec('🎮 Игра'); select('Сложность (для новых монстров)', 'difficulty', [['easy', 'Лёгкая'], ['normal', 'Обычная'], ['hard', 'Тяжёлая']], () => { if (G.prof) G.prof.difficulty = st.difficulty; });
     select('Длина игровых суток', 'dayLen', [[1, 'Медленно (24 мин)'], [2, 'Обычно (12 мин)'], [4, 'Быстро (6 мин)']]);
-    toggle('Автосохранение (каждую минуту)', 'autosave'); toggle('Пауза при открытии окон', 'pauseOnPanel'); toggle('Имена персонажей над головой', 'showNames');
+    toggle('Режим разработчика (панель F2)', 'dev'); toggle('Автосохранение (каждую минуту)', 'autosave'); toggle('Пауза при открытии окон', 'pauseOnPanel'); toggle('Имена персонажей над головой', 'showNames');
     sec('🖥 Графика и интерфейс'); slider('Масштаб камеры', 'zoom', 1, 2.5, 0.1, x => x.toFixed(1) + '×'); toggle('Числа урона', 'dmgNumbers'); toggle('Тряска экрана', 'shake'); toggle('Погода (дождь/снег)', 'weather'); toggle('Частицы и эффекты', 'particles'); toggle('Миникарта', 'minimap');
     const b = $('#sb'); b.appendChild(UI.btn('⛶ Полный экран', () => { if (!document.fullscreenElement) document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); else document.exitFullscreen(); }));
     b.appendChild(UI.btn('Сбросить', () => { G.settings = Object.assign({}, DEFAULT_SETTINGS); saveSettings(); UI.scrSettings(s); }));

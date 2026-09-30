@@ -1,6 +1,8 @@
 'use strict';
 /* ===== Ядро игры: состояние, профили, статы, инвентарь, время ===== */
-const DEFAULT_SETTINGS = { master: 0.8, music: 0.5, sfx: 0.7, difficulty: 'normal', dayLen: 2, dmgNumbers: true, shake: true, weather: true, minimap: true, zoom: 1.5, particles: true, autosave: true, pauseOnPanel: true, showNames: true };
+var G_DEV;
+const DEFAULT_SETTINGS = { master: 0.8, music: 0.5, sfx: 0.7, difficulty: 'normal', dayLen: 2, dmgNumbers: true, shake: true, weather: true, minimap: true, zoom: 1.5, particles: true, autosave: true, pauseOnPanel: true, showNames: true, dev: false };
+G_DEV = { god: false, onehit: false, fast: false, fly: false };
 const G = {
   mode: 'menu', world: null, prof: null, P: null, mons: [], npcs: [], petEnt: null, proj: [], fx: [], texts: [], areas: [], timers: [], lightning: [],
   cam: { x: 0, y: 0, zoom: 1.5 }, t: 0, min: START_ABS_MIN, timeScale: 2, settings: null, keys: new Set(), mouse: { x: 0, y: 0, wx: 0, wy: 0, down: false },
@@ -11,7 +13,7 @@ const G = {
 /* ===== Настройки ===== */
 function loadSettings() {
   let s = {}; try { s = JSON.parse(localStorage.getItem('rpg_settings') || '{}'); } catch (e) { }
-  G.settings = Object.assign({}, DEFAULT_SETTINGS, s); applySettings();
+  G.settings = Object.assign({}, DEFAULT_SETTINGS, s); if (/[?&]dev=1/.test(location.search)) G.settings.dev = true; applySettings();
 }
 function saveSettings() { try { localStorage.setItem('rpg_settings', JSON.stringify(G.settings)); } catch (e) { } applySettings(); }
 function applySettings() {

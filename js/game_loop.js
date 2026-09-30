@@ -29,6 +29,7 @@ function onKeyDown(e) {
   if (G.dialog) { const m = e.code.match(/^Digit(\d)$/); if (m) UI.dialogPick(+m[1] - 1); if (e.code === 'KeyE' || e.code === 'Enter') UI.dialogPick(0); return; }
   const tabs = { KeyI: 'inv', KeyC: 'char', KeyK: 'skills', KeyJ: 'quests', KeyM: 'map', KeyB: 'bestiary', KeyP: 'pets', KeyL: 'calendar' };
   if (tabs[e.code]) { UI.togglePanel(tabs[e.code]); return; }
+  if (e.code === 'F2' && G.settings.dev) { e.preventDefault(); UI.toggleDev(); return; }
   if (e.code === 'F1') { e.preventDefault(); UI.showScreen('controls', true); return; }
   if (G.paused || G.P.dead) return;
   if (e.code === 'KeyE') interact();

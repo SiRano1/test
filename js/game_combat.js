@@ -51,7 +51,7 @@ function spawnEventMon(id, tx, ty, lvl, event) { const sp = { id, tx, ty, lvl: c
 
 /* ---- урон игроку ---- */
 function hurtPlayer(raw, src, opts = {}) {
-  const P = G.P, S = G.S; if (P.dead || P.invuln > G.t) return 0;
+  const P = G.P, S = G.S; if (P.dead || P.invuln > G.t || (G_DEV.god && G.settings.dev)) return 0;
   if (!opts.noDodge && Math.random() < S.dodge) { floatText(P.x, P.y - 50, 'Уклон', '#8cf'); return 0; }
   let d = raw * 50 / (50 + S.def); d *= (1 - S.dr); d = Math.max(1, Math.round(d));
   if (P.shield > 0) { const a = Math.min(P.shield, d); P.shield -= a; d -= a; floatText(P.x, P.y - 46, 'Щит', '#8cf'); }
@@ -88,7 +88,7 @@ function damageMon(m, amount, o = {}) {
   const P = G.P, S = G.S, cls = G.prof.cls;
   let d = amount * 60 / (60 + m.def);
   if (cls === 'assassin' && (o.melee || o.back)) { const toP = Math.atan2(P.y - m.y, P.x - m.x); if (o.back || Math.abs(angDiff(toP, m.ang)) > 2.1) { d *= 1.6; o.crit = true; floatText(m.x, m.y - 50, 'В спину!', '#c8f'); } }
-  if (m.boss) d *= 1; d = Math.max(1, Math.round(d));
+  if (G_DEV.onehit && G.settings.dev && !o.dot) d = 1e9; d = Math.max(1, Math.round(d));
   m.hp -= d; m.hurt = 0.15; m.lastHit = G.t; P.lastCombat = G.t; m.aggroed = true;
   if (m.state === 'idle') m.state = 'chase'; G.target = m; G.targetT = G.t;
   floatText(m.x, m.y - 30 * m.d.size - 16, o.crit ? `${d}!` : `${d}`, o.crit ? '#ffd23a' : (o.dot ? '#b8f' : '#fff'), o.crit ? 'big' : 'n');
@@ -176,7 +176,7 @@ function updatePlayer(dt) {
   P.aim = Math.atan2(G.mouse.wy - (P.y - 14), G.mouse.wx - P.x);
   let mx = 0, my = 0;
   if (!G.paused && !G.dialog) { const k = G.keys; if (k.has('KeyW') || k.has('ArrowUp')) my -= 1; if (k.has('KeyS') || k.has('ArrowDown')) my += 1; if (k.has('KeyA') || k.has('ArrowLeft')) mx -= 1; if (k.has('KeyD') || k.has('ArrowRight')) mx += 1; }
-  const fly = P.form === 'eagle';
+  const fly = P.form === 'eagle' || (G_DEV.fly && G.settings.dev);
   if (P.dash) {
     const d = P.dash; d.t += dt; const sp = d.dist / d.dur * dt, ox = P.x, oy = P.y; moveEntity(P, Math.cos(d.ang) * sp, Math.sin(d.ang) * sp, 8, fly);
     if (d.hitMult) for (const m of enemies()) { if (!d.hit.has(m) && Math.hypot(m.x - P.x, m.y - P.y) < 34 + mRad(m)) { d.hit.add(m); const h = calcHit(d.hitMult); damageMon(m, h.d, { crit: h.crit, kb: 30, melee: true, rage: 8 }); } }
@@ -186,7 +186,7 @@ function updatePlayer(dt) {
   else {
     const len = Math.hypot(mx, my), busy = P.anim && (P.anim.kind === 'cast' || P.anim.kind === 'shoot') ? 0.55 : P.anim ? 0.75 : 1;
     P.moving = len > 0;
-    if (len > 0) { mx /= len; my /= len; const sp = S.spd * terrainSpeed(P.x, P.y) * busy * (P.slowT > G.t ? 0.5 : 1) * 1.05; moveEntity(P, mx * sp * dt, my * sp * dt, 8, fly); if (!P.anim) { if (Math.abs(my) > Math.abs(mx) + 0.1) { P.dir = my > 0 ? 'down' : 'up'; } else { P.dir = 'side'; P.flip = mx < 0; } } }
+    if (len > 0) { mx /= len; my /= len; const sp = S.spd * (G_DEV.fast && G.settings.dev ? 2.5 : 1) * terrainSpeed(P.x, P.y) * busy * (P.slowT > G.t ? 0.5 : 1) * 1.05; moveEntity(P, mx * sp * dt, my * sp * dt, 8, fly); if (!P.anim) { if (Math.abs(my) > Math.abs(mx) + 0.1) { P.dir = my > 0 ? 'down' : 'up'; } else { P.dir = 'side'; P.flip = mx < 0; } } }
   }
   if (P.anim) { P.anim.t += dt; P.anim.p = P.anim.t / P.anim.dur; if (!P.anim.done && P.anim.p >= P.anim.hitAt) { P.anim.done = true; P.anim.fn && P.anim.fn(); } if (P.anim && P.anim.p >= 1) P.anim = null; }
   // ввод атаки
