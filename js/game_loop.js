@@ -65,7 +65,7 @@ function update(dt) {
   for (let i = G.lightning.length - 1; i >= 0; i--) { G.lightning[i].t += dt; if (G.lightning[i].t > G.lightning[i].life) G.lightning.splice(i, 1); }
   if (G.shakeT > 0) G.shakeT -= dt;
   if (G.target && (G.target.dead || G.t - G.targetT > 6)) G.target = null;
-  questReach(dt); revealMap(dt);
+  questReach(dt); revealMap(dt); tutUpdate();
   G.hint = P.dead ? null : nearbyInteractable();
   if (G.tourney && Math.hypot(P.x / TS - 62, P.y / TS - 67) > 10) { toast('Вы покинули арену — турнир проигран', 'warn'); endTourney(false); }
   if (P.dead && P.deadT > 1.6 && !UI.deathShown) UI.showDeath();
@@ -167,13 +167,13 @@ function renderScene(play) {
   if (play) {
     for (const f of G.fx) drawFx(c, f);
     for (const l of G.lightning) drawLightning(c, l);
-    drawFireworks(c); drawFishing(c);
+    drawFireworks(c); drawFishing(c); drawTutArrow(c);
     // индикатор цели интерактива
     if (G.hint && !G.paused) { const o = G.hint.n || G.hint.o; const yy = (G.hint.n ? o.y - 70 : o.y - 40) + Math.sin(G.at * 5) * 2; c.font = 'bold 12px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 3; const tx = '[E] ' + G.hint.label; c.strokeText(tx, o.x, yy); c.fillText(tx, o.x, yy); c.textAlign = 'left'; }
     for (const tx of G.texts) { const a = clamp(1 - (tx.t - tx.life * 0.6) / (tx.life * 0.4), 0, 1); c.globalAlpha = a; const big = tx.size === 'big'; c.font = `bold ${big ? 18 : 13}px Georgia, serif`; c.textAlign = 'center'; c.strokeStyle = '#000'; c.lineWidth = 3; c.strokeText(tx.text, tx.x, tx.y); c.fillStyle = tx.color; c.fillText(tx.text, tx.x, tx.y); c.globalAlpha = 1; c.textAlign = 'left'; }
   }
   // освещение
-  const inDg = play && G.P.y >= OW_H * TS; const amb = inDg ? [8, 10, 26, 0.68] : ambientAt(d.hf); const lights = w.lights.filter(l => zoneBlock(l.x, l.y) === zb);
+  const inDg = play && G.P.y >= OW_H * TS, inHome = inDg && G.P.x / TS >= 34 && G.P.x / TS < 66 && G.P.y / TS >= 128; const amb = inHome ? [40, 24, 10, 0.22] : inDg ? [8, 10, 26, 0.68] : ambientAt(d.hf); const lights = w.lights.filter(l => zoneBlock(l.x, l.y) === zb);
   if (play) { const P = G.P; lights.push({ x: P.x, y: P.y - 14, r: (night > 0.3 || inDg) ? 180 : 60, noglow: true, a: 0.95 }); for (const pr of G.proj) if (pr.light) lights.push({ x: pr.x, y: pr.y, r: pr.light, a: 0.9 }); for (const m of G.mons) if (m.boss && !m.dead && zoneBlock(m.x, m.y) === zb) lights.push({ x: m.x, y: m.y - 20, r: 110, noglow: true, a: 0.7 }); }
   const lf = { a: 0 };
   if (G.events.festival && night > 0.3) { for (let i = 0; i < 8; i++) lights.push({ x: (44 + i * 1.8) * TS, y: 45 * TS, r: 70 }); }
@@ -184,6 +184,11 @@ function renderScene(play) {
   if (play && G.P.hp / G.P.maxHp < 0.3 && !G.P.dead) { c.fillStyle = `rgba(160,0,0,${0.15 + 0.1 * Math.sin(G.at * 5)})`; c.fillRect(0, 0, cw, ch); }
   if (play && G.P.hurt > 0) { c.fillStyle = `rgba(200,0,0,${G.P.hurt})`; c.fillRect(0, 0, cw, ch); }
   if (play && G.P.dead) { c.fillStyle = 'rgba(30,0,0,0.55)'; c.fillRect(0, 0, cw, ch); }
+}
+function drawTutArrow(c) {
+  if (G.prof.flags.tut >= 6 || G.paused) return; const t = tutTarget(); if (!t) return; const P = G.P, tx = t.x, ty = t.y - 16, d = Math.hypot(tx - P.x, ty - (P.y - 16)), a = Math.atan2(ty - (P.y - 16), tx - P.x);
+  const pulse = 0.5 + 0.5 * Math.sin(G.at * 5); c.strokeStyle = `rgba(255,224,102,${0.4 + pulse * 0.5})`; c.lineWidth = 3; c.beginPath(); c.arc(t.x, t.y - 10, 22 + pulse * 6, 0, TAU); c.stroke();
+  if (d > 90) { const r = 56, ax = P.x + Math.cos(a) * r, ay = P.y - 16 + Math.sin(a) * r; c.save(); c.translate(ax, ay); c.rotate(a); c.fillStyle = '#ffe066'; c.strokeStyle = '#000'; c.lineWidth = 2; c.beginPath(); c.moveTo(12, 0); c.lineTo(-6, -8); c.lineTo(-2, 0); c.lineTo(-6, 8); c.closePath(); c.fill(); c.stroke(); c.restore(); }
 }
 function drawFishing(c) {
   const f = G.fish; if (!f) return; const P = G.P, by = f.by + Math.sin(G.at * 3) * (f.state === 'bite' ? 3 : 1);

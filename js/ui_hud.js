@@ -37,6 +37,7 @@ UI.buildHud = function () {
   </div>
   <div id="h-quests" class="hud-box"></div>
   <div id="h-target" class="hidden"></div>
+  <div id="h-tut" class="hidden"></div>
   <div id="h-menu"></div>
   <div id="h-log"></div>
   <div id="h-mini"><canvas id="h-minicv" width="176" height="176"></canvas><div id="h-zone"></div></div>
@@ -71,7 +72,7 @@ UI.hudFrame = function (dt) {
     // баффы
     const bf = P.buffs.map(b => `<span class="buff" data-i="${b.id}">${b.icon}<i>${Math.max(0, Math.ceil(b.until - G.t))}</i></span>`).join('') + (P.form ? `<span class="buff form">${SKILLS[P.form].icon}<i>форма</i></span>` : ''); setHtml('h-buffs', bf);
     const pd = activePetData(); const pe = G.petEnt; setHtml('h-pet', pd && pe ? `<div class="pet-mini" style="border-color:${RARITY[PETS[pd.id].r].c}">${PETS[pd.id].icon} <b>${pd.name}</b> ур.${pd.lvl}<div class="bar small"><div class="fill" style="width:${clamp(pe.hp / pe.maxHp * 100, 0, 100)}%;background:#5c5"></div></div>${pe.down ? '<small>без сил</small>' : ''}</div>` : '');
-    UI.updateQuestTracker(); UI.updateTarget(); UI.updateLog(); UI.updateMenuBtns();
+    UI.updateTut(); UI.updateQuestTracker(); UI.updateTarget(); UI.updateLog(); UI.updateMenuBtns();
   }
   if (UI.dirty || UIH.actionSig !== UI.actionSig()) { UIH.actionSig = UI.actionSig(); UI.buildActionBar(); }
   UI.updateCooldowns(); UI.drawMinimap(dt);
@@ -100,6 +101,11 @@ UI.updateCooldowns = function () {
   $$('#h-action .slot[data-skill]').forEach(s => { const id = s.dataset.skill, S = SKILLS[id], rem = ((G.cd[id] || 0) - G.t); const cd = $('.cd', s); const k = rem > 0 ? clamp(rem / S.cd, 0, 1) : 0; cd.style.height = k * 100 + '%'; cd.textContent = rem > 0.05 ? (rem < 10 ? rem.toFixed(1) : Math.ceil(rem)) : ''; const noRes = G.P.res < S.cost && !(G.P.form === id); s.classList.toggle('nores', noRes); s.classList.toggle('active', G.P.form === id); });
   const r = $('#h-action .slot.racial'); if (r) { const a = RACES[G.prof.race].active, rem = (G.cd[a.id] || 0) - G.t, cd = $('.cd', r); cd.style.height = (rem > 0 ? clamp(rem / a.cd, 0, 1) : 0) * 100 + '%'; cd.textContent = rem > 0.05 ? Math.ceil(rem) : ''; }
   $$('#h-action .slot.pot').forEach(s => { const k = s.dataset.pcd; if (!k) return; const rem = G.potCd[k] - G.t, cd = $('.cd', s); cd.style.height = (rem > 0 ? clamp(rem / 5, 0, 1) : 0) * 100 + '%'; cd.textContent = rem > 0.05 ? Math.ceil(rem) : ''; });
+};
+UI.updateTut = function () {
+  const t = $('#h-tut'), f = G.prof.flags; if (f.tut >= 6) { t.classList.add('hidden'); return; } t.classList.remove('hidden');
+  const html = `<div class="tut-h">🧭 Обучение · шаг ${f.tut + 1} из 6</div><div class="tut-t">${TUT_STEPS[f.tut]}</div><button id="tut-skip">Пропустить обучение</button>`;
+  if (UIH.last.tut !== html) { UIH.last.tut = html; t.innerHTML = html; $('#tut-skip').onclick = () => { f.tut = 6; UI.dirty = true; }; }
 };
 UI.updateQuestTracker = function () {
   const p = G.prof, list = Object.keys(p.quests).filter(id => p.quests[id].state === 'active' && !(p.flags.untrack && p.flags.untrack[id])).sort((a, b) => (QUESTS[b].main ? 1 : 0) - (QUESTS[a].main ? 1 : 0)).slice(0, 4);

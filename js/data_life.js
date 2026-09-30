@@ -67,6 +67,8 @@ const DUNGEONS = [
   { id: 'witch', name: 'Логово ведьмы', x0: 2, y0: 128, lvl: 7, boss: 'witch', entrance: [26, 84], mobs: [['slime', 6], ['goblin', 5], ['spider', 3]], loot: [['ectoplasm', 3], ['rs_1', 3]], gold: 380 }
 ];
 DUNGEONS.forEach(d => { LOCS['d_' + d.id] = { name: d.name, x: d.x0 + 16, y: d.y0 + 11, r: 17, icon: '🕳️', dungeon: true }; });
+const HOME = { x0: 34, y0: 128, entry: [48, 141] };
+LOCS.home = { name: 'Дом деда', x: 48, y: 138, r: 12, icon: '🏠', dungeon: true };
 LOCS.farmplots = { name: 'Грядки фермы', x: 42, y: 76, r: 6, icon: '🌱', hidden: true };
 const RESPAWN_BOSSES = ['skar', 'spiderqueen', 'lichking', 'frostgiant', 'witch', 'ignis'];
 

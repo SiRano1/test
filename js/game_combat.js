@@ -195,7 +195,7 @@ function updatePlayer(dt) {
   const inCombat = G.t - P.lastCombat < 4;
   if (G.prof.cls === 'berserk') { if (!inCombat) P.res = Math.max(0, P.res - 4 * dt); }
   else { let rg = S.regen * (G.prof.cls === 'mage' && !inCombat ? 2 : 1); if (P.form) rg = 0; P.res = Math.min(P.maxRes, P.res + rg * dt); }
-  P.hp = Math.min(P.maxHp, P.hp + S.hpRegen * (inCombat ? 0.3 : 1) * dt);
+  P.hp = Math.min(P.maxHp, P.hp + (inCombat ? S.hpRegen * 0.3 : S.hpRegen + P.maxHp * 0.02) * dt);
   if (P.hot) { const a = Math.min(P.hot.left, P.hot.rate * dt); P.hp = Math.min(P.maxHp, P.hp + a); P.hot.left -= a; if (P.hot.left <= 0.01 || G.t > P.hot.until) P.hot = null; if (Math.random() < 0.15) burst(P.x, P.y - 14, '#5f5', 1, 20); }
   if (P.form) { const drain = { wolf: 1, bear: 1.5, eagle: 1.2 }[P.form]; P.res -= drain * dt; if (P.res <= 0) { P.res = 0; setForm(null); toast('Мана иссякла — вы вернулись в облик человека', 'warn'); } }
   for (let i = P.dots.length - 1; i >= 0; i--) { const d = P.dots[i]; d.tick -= dt; if (d.tick <= 0) { d.tick = 0.5; hurtPlayer(d.dps * 0.5, null, { noDodge: true, keepStealth: true }); } if (G.t > d.until) P.dots.splice(i, 1); }

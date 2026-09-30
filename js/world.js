@@ -1,8 +1,8 @@
 'use strict';
 /* ===== Генерация открытого мира ===== */
 const WW = 100, WH = 150, OW_H = 100, TS = 32;
-const T = { DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, FOREST: 4, ROCK: 5, SNOW: 6, ASH: 7, ROAD: 8, SWAMP: 9, PLAZA: 10, ARENA: 11, BRIDGE: 12, FLOOR: 13 };
-const TILE_COL = { 0: '#1f4f8f', 1: '#4c9ad0', 2: '#e2cf8f', 3: '#5c9a3c', 4: '#457a30', 5: '#6b6f78', 6: '#eef4fa', 7: '#3c3636', 8: '#b8996a', 9: '#3f5a3a', 10: '#b0a48c', 11: '#c9a86a', 12: '#8a6a3c', 13: '#5a5860' };
+const T = { DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, FOREST: 4, ROCK: 5, SNOW: 6, ASH: 7, ROAD: 8, SWAMP: 9, PLAZA: 10, ARENA: 11, BRIDGE: 12, FLOOR: 13, WOOD: 14 };
+const TILE_COL = { 0: '#1f4f8f', 1: '#4c9ad0', 2: '#e2cf8f', 3: '#5c9a3c', 4: '#457a30', 5: '#6b6f78', 6: '#eef4fa', 7: '#3c3636', 8: '#b8996a', 9: '#3f5a3a', 10: '#b0a48c', 11: '#c9a86a', 12: '#8a6a3c', 13: '#5a5860', 14: '#a87a48' };
 
 const BUILDINGS_DEF = [
   // name, kind, x, y, w, h, roof, sign
@@ -198,7 +198,7 @@ function genWorld(seed = 1337) {
   // Ферма
   addObj('hay', 41, 69, { block: true }); addObj('hay', 46, 69, { block: true }); addObj('cart', 48, 73, { block: true });
   for (let y = 75; y <= 78; y++) for (let x = 38; x <= 45; x++) addObj('plot', x, y, { key: x + ',' + y });
-  addObj('bed', 38, 73, {}); addObj('bin', 40, 73, { block: true }); addObj('board', 44, 47, { block: true });
+  addObj('door', 37, 73, { dest: [HOME.entry[0], HOME.entry[1]], label: 'Войти в дом', home: true }); addObj('bin', 40, 73, { block: true }); addObj('board', 44, 47, { block: true });
   // Собака Бублик
   addObj('dog', 52, 82, {});
 
@@ -232,6 +232,13 @@ function genWorld(seed = 1337) {
     dgSpawns.push({ id: d.boss, tx: X(26), ty: Y(11), lvl: MON[d.boss].lvl[0], boss: d.boss, dg: d.id });
     const [ex, ey] = d.entrance; addObj('portal', ex, ey, { dest: [X(4), Y(12)], label: d.name, light: 130, dg: d.id, lvl: d.lvl });
   });
+
+  /* --- Дом деда (интерьер) --- */
+  { const X = HOME.x0, Y = HOME.y0; rectTiles(X + 8, Y + 6, X + 21, Y + 15, T.WOOD);
+    addObj('ibed', X + 9, Y + 7, { block: true }); addObj('table', X + 16, Y + 8, { block: true }); addObj('stove', X + 20, Y + 7, { block: true, light: 150 });
+    const hc = addObj('chest', X + 9, Y + 13, { block: true, id: 'home_chest', loot: [['seed_carrot', 6], ['seed_healherb', 3], ['hp_0', 2], ['food_bread', 2]], gold: 30 }); w.chests.push(hc);
+    addObj('shelf', X + 13, Y + 6, { block: true }); addObj('shelf', X + 18, Y + 6, { block: true }); addObj('rug', X + 14, Y + 10, {}); addObj('plantpot', X + 21, Y + 14, { block: true }); addObj('lamp', X + 12, Y + 12, { block: true, light: 170 });
+    addObj('door', X + 14, Y + 15, { dest: [37, 74], label: 'Выйти на улицу', exit: true, int: true, home: true }); }
 
   /* --- Спавны монстров --- */
   const zoneAt = (x, y) => { const c = get(x, y); return c === T.SNOW ? 'snow' : c === T.ROCK ? 'mountain' : c === T.ASH ? 'ash' : c === T.SWAMP ? 'swamp' : c === T.FOREST ? 'forest' : (c === T.GRASS || c === T.SAND || c === T.ROAD || c === T.FLOOR) ? 'plains' : null; };
@@ -316,6 +323,6 @@ function genWorld(seed = 1337) {
 function randiS(rng, a, b) { return a + Math.floor(rng() * (b - a + 1)); }
 
 function isSafeTile(x, y) {
-  if (y >= OW_H) return false; if (x > 34 && x < 66 && y > 33 && y < 64) return true;
+  if (y >= OW_H) return x >= 34 && x < 66 && y >= 128; if (x > 34 && x < 66 && y > 33 && y < 64) return true;
   const c = (l, r) => Math.hypot(x - l.x, y - l.y) < r; return c(LOCS.hamlet, 7) || c(LOCS.tower, 6) || c(LOCS.scout, 5) || Math.hypot(x - 41, y - 74) < 10;
 }

@@ -32,7 +32,15 @@ function drawTile(ctx, w, tx, ty, t, season) {
       if (deep && !w.blk[ty * WW + tx]) { /* deep */ }
       break;
     }
+    case T.WOOD: ctx.fillStyle = h < 0.5 ? '#a87a48' : '#9c6f3f'; ctx.fillRect(x, y, TS, TS); ctx.fillStyle = '#7a5430'; ctx.fillRect(x, y + 10, TS, 1); ctx.fillRect(x, y + 21, TS, 1); ctx.fillRect(x + 8 + h2 * 16, y, 1, 10); ctx.fillRect(x + 6 + h3 * 18, y + 11, 1, 10); ctx.fillRect(x + 12 + h * 10, y + 22, 1, 10); ctx.fillStyle = 'rgba(255,255,255,0.07)'; ctx.fillRect(x + 2, y + 3, 12, 2); break;
     case T.ROCK: {
+      if (ty >= 128 && tx >= 34 && tx < 66) {
+        const gw = (dx, dy) => w.get(tx + dx, ty + dy) === T.WOOD;
+        if (gw(0, 1)) { ctx.fillStyle = '#d6c294'; ctx.fillRect(x, y, TS, TS); ctx.fillStyle = '#c4ad7c'; ctx.fillRect(x, y + 6, TS, 1); ctx.fillRect(x + 15, y, 1, TS); ctx.fillStyle = '#6a4a2a'; ctx.fillRect(x, y + TS - 9, TS, 9); ctx.fillStyle = '#4a3220'; ctx.fillRect(x, y + TS - 9, TS, 1); if ((tx + ty) % 5 === 0) { ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 4, y + 3, 24, 16); ctx.fillStyle = state_night_win(); ctx.fillRect(x + 6, y + 5, 20, 12); ctx.fillStyle = '#3a2a1a'; ctx.fillRect(x + 15, y + 5, 2, 12); } }
+        else if (gw(-1, 0) || gw(1, 0) || gw(-1, 1) || gw(1, 1) || gw(0, -1)) { ctx.fillStyle = '#5a4030'; ctx.fillRect(x, y, TS, TS); ctx.fillStyle = '#4a3222'; ctx.fillRect(x + 10, y, 2, TS); }
+        else { ctx.fillStyle = '#120c08'; ctx.fillRect(x, y, TS, TS); }
+        break;
+      }
       ctx.fillStyle = '#767a84'; ctx.fillRect(x, y, TS, TS);
       const up = w.get(tx, ty - 1) === T.ROCK, dn = w.get(tx, ty + 1) === T.ROCK;
       ctx.fillStyle = '#868a94'; ctx.fillRect(x + 2, y + 2, 14 + h * 8, 10); ctx.fillStyle = '#62666f'; ctx.fillRect(x + 14 + h2 * 8, y + 14, 14, 12);
@@ -138,6 +146,13 @@ function drawObj(ctx, o, t, season, state) {
     case 'bin': shadow(16, 5); RO(-14, -20, 28, 20, '#9a6a34'); R(-14, -20, 28, 4, '#7a4a20'); R(-10, -12, 20, 2, '#5a3a1a'); ctx.font = '12px serif'; ctx.fillText('💰', x - 6, y - 6); break;
     case 'board': shadow(20, 5); RO(-2, -40, 4, 40, '#5a3a20'); RO(-20, -50, 40, 32, '#8a5a30'); R(-17, -47, 34, 26, '#e8d8a8'); R(-14, -44, 10, 8, '#fff'); R(-2, -44, 10, 6, '#f6e8b8'); R(-14, -33, 12, 8, '#f6e8b8'); R(2, -34, 12, 10, '#fff'); R(-12, -43, 2, 2, '#c33'); break;
     case 'portal': { const g = 0.5 + 0.5 * Math.sin(t * 3 + o.tx); shadow(22, 7, 0.3); RO(-22, -60, 8, 60, '#6a6a76'); RO(14, -60, 8, 60, '#6a6a76'); RO(-22, -68, 44, 10, '#7a7a86'); ctx.fillStyle = OUT; ctx.beginPath(); ctx.ellipse(x, y - 30, 15, 30, 0, 0, TAU); ctx.fill(); const gr = ctx.createRadialGradient(x, y - 30, 2, x, y - 30, 30); gr.addColorStop(0, o.exit ? '#aaf' : '#e8a0ff'); gr.addColorStop(1, `rgba(${o.exit ? '60,80,200' : '120,30,170'},${0.75 + g * 0.2})`); ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(x, y - 30, 14, 28, 0, 0, TAU); ctx.fill(); ctx.fillStyle = 'rgba(255,255,255,0.5)'; for (let i = 0; i < 4; i++) { const a = t * 2 + i * 1.6; ctx.fillRect(x + Math.cos(a) * 8 - 1, y - 30 + Math.sin(a) * 18 - 1, 3, 3); } break; }
+    case 'ibed': shadow(22, 6, 0.2); RO(-16, -24, 32, 26, '#6a4a2a'); R(-14, -22, 28, 20, '#e8e0d0'); R(-14, -22, 28, 8, '#d8c8a8'); R(-12, -20, 12, 6, '#fff'); R(-14, -12, 28, 10, '#b8402a'); R(-14, -12, 28, 2, '#d8603a'); break;
+    case 'table': shadow(24, 6, 0.25); RO(-24, -22, 48, 10, '#8a5a30'); R(-22, -12, 4, 12, '#6a4020'); R(18, -12, 4, 12, '#6a4020'); if (!G.prof.flags.letter) { R(-8, -25, 16, 6, '#f6ecd0'); R(-8, -25, 16, 1, '#c8b890'); R(-1, -23, 2, 2, '#c33'); ctx.fillStyle = `rgba(255,240,150,${0.3 + 0.3 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.arc(x, y - 22, 14, 0, TAU); ctx.fill(); } else { R(-6, -25, 12, 4, '#f6ecd0'); R(12, -30, 5, 8, '#c8a040'); } break;
+    case 'stove': shadow(20, 6, 0.25); RO(-18, -34, 36, 34, '#4a4a54'); R(-14, -30, 28, 6, '#6a6a76'); R(-10, -18, 20, 12, '#1a1010'); { const fl = Math.sin(t * 10) * 1.5; ctx.fillStyle = '#ff7a1a'; ctx.beginPath(); ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + fl, y - 16); ctx.lineTo(x + 6, y - 6); ctx.fill(); ctx.fillStyle = '#ffd23a'; ctx.beginPath(); ctx.moveTo(x - 3, y - 6); ctx.lineTo(x + fl * 0.5, y - 12); ctx.lineTo(x + 3, y - 6); ctx.fill(); } R(-4, -42, 8, 10, '#3a3a44'); break;
+    case 'shelf': RO(-20, -40, 40, 30, '#6a4a2a'); R(-18, -28, 36, 2, '#8a6a3a'); for (let i = 0; i < 5; i++) { R(-17 + i * 7, -38, 5, 10, ['#c33', '#36c', '#3a3', '#c93', '#93c'][(i + v) % 5]); } for (let i = 0; i < 4; i++) R(-16 + i * 9, -25, 6, 8, ['#e8d8a0', '#8fc', '#f8a', '#fc6'][i]); break;
+    case 'rug': ctx.fillStyle = '#8a2a2a'; ctx.fillRect(x - 40, y - 26, 80, 44); ctx.fillStyle = '#c9a24a'; ctx.fillRect(x - 36, y - 22, 72, 36); ctx.fillStyle = '#8a2a2a'; ctx.fillRect(x - 32, y - 18, 64, 28); ctx.fillStyle = '#e8c860'; ctx.fillRect(x - 6, y - 8, 12, 8); break;
+    case 'plantpot': shadow(9, 3); RO(-7, -12, 14, 12, '#a85a3a'); for (let i = 0; i < 3; i++) R(-6 + i * 5, -26 + (i % 2) * 4, 3, 16 - (i % 2) * 4, '#3f9a4a'); R(-8, -28, 6, 4, '#5fca6a'); R(2, -24, 6, 4, '#5fca6a'); break;
+    case 'door': if (o.int) { RO(-14, -40, 28, 40, '#5a3a1a'); R(-11, -37, 22, 37, '#7a5228'); R(5, -18, 3, 3, '#f0c850'); } break;
     case 'dog': { const bob = Math.abs(Math.sin(t * 5)) * 2; shadow(9, 3); const wag = Math.sin(t * 14) * 3; ctx.fillStyle = OUT; ctx.fillRect(x - 10, y - 14 - bob, 20, 12); ctx.fillStyle = '#c99a5a'; ctx.fillRect(x - 9, y - 13 - bob, 18, 10); ctx.fillRect(x + 6, y - 20 - bob, 8, 8); ctx.fillRect(x - 12, y - 16 - bob + wag * 0.3, 4, 3); ctx.fillStyle = '#7a5a30'; ctx.fillRect(x + 6, y - 21 - bob, 3, 5); ctx.fillStyle = '#111'; ctx.fillRect(x + 11, y - 17 - bob, 2, 2); ctx.fillStyle = '#e8d8b0'; ctx.fillRect(x - 6, y - 8 - bob, 12, 3); break; }
     case 'fence': RO(-2, -14, 4, 14, '#7a5a30'); R(-6, -10, 12, 2, '#96703c'); R(-6, -5, 12, 2, '#96703c'); break;
     case 'chest': { const op = state.opened && state.opened.has(o.id); shadow(13, 4); RO(-11, -14, 22, 14, op ? '#6a4a2a' : '#9a6a30'); R(-11, -9, 22, 2, '#f0c850'); if (op) { R(-11, -20, 22, 6, '#7a5a2a'); R(-9, -12, 18, 2, '#1a1010'); } else { R(-11, -20, 22, 7, '#b07a3a'); R(-2, -10, 4, 5, '#f0c850'); if (state.hilite) { ctx.fillStyle = `rgba(255,230,120,${0.3 + 0.2 * Math.sin(t * 4)})`; ctx.beginPath(); ctx.arc(x, y - 12, 18, 0, TAU); ctx.fill(); } } break; }
@@ -253,3 +268,4 @@ function drawWeather(ctx, cw, ch, t, kind, amt, dpr) {
   }
   ctx.restore();
 }
+function state_night_win() { return '#9ac8e8'; }

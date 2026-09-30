@@ -12,7 +12,7 @@ const LOCS = {
   cave: { name: 'Пещера Горака', x: 50, y: 10, r: 8, icon: '🕳️' },
   keep: { name: 'Пепельная крепость', x: 89, y: 13, r: 9, icon: '🌋' },
   meadow: { name: 'Южный луг', x: 52, y: 82, r: 5, icon: '🌼' },
-  farm: { name: 'Ферма Хобба', x: 43, y: 71, r: 6, icon: '🌾' },
+  farm: { name: 'Ферма деда', x: 41, y: 74, r: 11, icon: '🌾' },
   arena: { name: 'Арена Эльдергарда', x: 62, y: 66, r: 6, icon: '⚔️' },
   swamp: { name: 'Гнилая топь', x: 22, y: 82, r: 10, icon: '🐸' },
   lake: { name: 'Зеркальное озеро', x: 19, y: 52, r: 8, icon: '🌊' },
@@ -70,7 +70,7 @@ const NPCS = [
     id: 'rurik', name: 'Рурик Зверолов', title: 'Мастер зверей', race: 'orc', gender: 'male', look: { skin: 0, hairStyle: 4, hair: 1, eye: 4, accent: 2, face: 2 }, cls: 'beast', outfit: '#5a6a30',
     home: 'beast_door', routine: [[8, 19, 'beast_door'], [19, 22, 'tavern_tables']], wander: 1, shop: 'beast',
     lines: { day: ['Зверь чувствует сердце хозяина.', 'Хочешь питомца? Смотри, но не кормись с руки.'], night: ['Звери спят. И я тоже.'], rain: ['Мои друзья не любят дождь.'], festival: ['Даже звери сегодня празднуют.'] },
-    rumors: [{ t: 'Чтобы приручить зверя, ослабь его и покажи приманку. Но не убей!' }, { t: 'Легендарных зверей не купишь: только найдёшь в дикой природе. Иногда они сами выбирают хозяина.' }], gifts: ['meat', 'wolf_pelt', 'bear_claw']
+    rumors: [{ t: 'Чтобы приручить зверя, ослабь его и покажи приманку. Но не убей!' }, { t: 'Мифических зверей не купишь: только найдёшь в дикой природе. Иногда они сами выбирают хозяина.' }], gifts: ['meat', 'wolf_pelt', 'bear_claw']
   },
   {
     id: 'berta', name: 'Берта Пивовар', title: 'Трактирщица', race: 'human', gender: 'female', look: { skin: 1, hairStyle: 3, hair: 5, eye: 1, accent: 0, face: 3 }, cls: 'inn', outfit: '#8a4a2a',

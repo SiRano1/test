@@ -20,13 +20,13 @@ function plotAction(o) {
   const f = G.prof.farm[o.key], P = G.P;
   if (!f) {
     const sd = bestSeed(); if (!sd) { toast(`Нет семян для сезона «${SEASONS[gt().season]}». Купите у Хобба.`, 'warn'); Snd.play('error'); return; }
-    removeItem(sd, 1); G.prof.farm[o.key] = { crop: ITEMS[sd].crop, grown: 0, wet: G.weather.amt > 0.3 }; Snd.play('pickup'); burst(o.x, o.y - 6, '#8a6a3a', 8, 40); questEvent('plant', 'any'); UI.dirty = true; return;
+    removeItem(sd, 1); G.prof.farm[o.key] = { crop: ITEMS[sd].crop, grown: 0, wet: G.weather.amt > 0.3 }; Snd.play('pickup'); burst(o.x, o.y - 6, '#8a6a3a', 8, 40); questEvent('plant', 'any'); tutAdvance(3); UI.dirty = true; return;
   }
   const c = CROPS[f.crop];
   if (f.grown >= c.days) {
     const n = 1 + (Math.random() < 0.25 * G.S.luck ? 1 : 0); addItem('crop_' + f.crop, n); delete G.prof.farm[o.key]; gainXp(6 + c.days * 2); Snd.play('coin'); burst(o.x, o.y - 8, c.col, 12, 50); questEvent('harvest', 'any'); G.prof.flags.harvested = (G.prof.flags.harvested || 0) + n; return;
   }
-  if (!f.wet) { f.wet = true; Snd.play('heal'); burst(o.x, o.y - 6, '#6af', 10, 40); return; }
+  if (!f.wet) { f.wet = true; Snd.play('heal'); burst(o.x, o.y - 6, '#6af', 10, 40); tutAdvance(4); return; }
   toast(`${c.name}: день ${f.grown} из ${c.days}. Уже полито — растёт!`);
 }
 function farmNewDay() {
@@ -144,4 +144,30 @@ function usePortal(o) {
 function sleepHome() {
   const h = gt().hf; if (h >= 6 && h < 18) { toast('Ещё рано ложиться — приходите после 18:00', 'warn'); return; }
   sleepAtInn(); questEvent('sleep', 'any');
+}
+
+/* ---------- Обучение в доме деда ---------- */
+const TUT_STEPS = [
+  'Осмотритесь: подойдите к столу и прочтите письмо деда (E)',
+  'Откройте сундук в углу — там припасы деда (E)',
+  'Выйдите на улицу через дверь внизу комнаты (E)',
+  'Это ваша ферма! Подойдите к грядке и посадите семена (E)',
+  'Теперь полейте посаженное растение (E у грядки)',
+  'Отлично! Идите на север по дороге в город Эльдергард — найдите мэра Маррена'
+];
+function tutAdvance(from) {
+  const f = G.prof.flags; if (f.tut !== from) return; f.tut++; Snd.play('quest'); if (f.tut < 6) toast('✔ Готово! Следующий шаг обучения', 'good'); UI.dirty = true;
+}
+function tutTarget() {
+  const f = G.prof.flags, P = G.P; if (f.tut >= 6) return null; const w = G.world;
+  const find = t => w.objs.find(o => o.t === t && (t !== 'door' || (P.y >= OW_H * TS ? o.int : !o.int)));
+  if (f.tut === 0) return find('table'); if (f.tut === 1) return w.objs.find(o => o.id === 'home_chest'); if (f.tut === 2) return find('door');
+  if (f.tut === 3) { const pl = w.objs.filter(o => o.t === 'plot' && !G.prof.farm[o.key]); return pl[0] ? (P.y < OW_H * TS ? pl.sort((a, b) => Math.hypot(a.x - P.x, a.y - P.y) - Math.hypot(b.x - P.x, b.y - P.y))[0] : find('door')) : null; }
+  if (f.tut === 4) { const pl = w.objs.filter(o => o.t === 'plot' && G.prof.farm[o.key] && !G.prof.farm[o.key].wet); return pl[0] || null; }
+  return { x: 50 * TS, y: 52 * TS };
+}
+function tutUpdate() {
+  const f = G.prof.flags; if (f.tut >= 6) return; const P = G.P;
+  if ((f.tut === 3 || f.tut === 4) && !G.prof.inv.some(s => ITEMS[s.id].type === 'seed') && !Object.keys(G.prof.farm).length) { addItem('seed_carrot', 3, true); }
+  if (f.tut >= 5 && isSafeTile(P.x / TS, P.y / TS) && P.x / TS > 34 && P.x / TS < 66 && P.y / TS > 33 && P.y / TS < 64) { f.tut = 6; UI.banner('🏰 Эльдергард', 'Найдите мэра Маррена на площади — над его головой светится «?»'); UI.dirty = true; }
 }

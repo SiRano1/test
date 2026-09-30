@@ -36,8 +36,8 @@ function newProfile(o) {
     id: 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1000), name: o.name || 'Герой', created: Date.now(), lastPlayed: Date.now(), playtime: 0,
     race: o.race, gender: o.gender, look: o.look, cls: o.cls, difficulty: o.difficulty || 'normal',
     lvl: 1, xp: 0, sp: 1, skills: {}, hp: 9999, res: 9999, gold: 60, inv: [], equip: { weapon: `w_${C.weapon}_0` },
-    pos: { x: WORLD_SPAWN.x * TS, y: WORLD_SPAWN.y * TS }, min: START_ABS_MIN, quests: {}, bestiary: {}, pets: [], activePet: null, rel: {}, opened: [], defeated: [], revealed: '',
-    flags: {}, kills: 0, deaths: 0, heard: {}, version: 2, farm: {}, daily: null, projects: {}, plus: {}
+    pos: { x: (HOME.entry[0] + 0.5) * TS, y: (HOME.entry[1] + 1) * TS - 6 }, min: START_ABS_MIN, quests: {}, bestiary: {}, pets: [], activePet: null, rel: {}, opened: [], defeated: [], revealed: '',
+    flags: { tut: 0 }, kills: 0, deaths: 0, heard: {}, version: 2, farm: {}, daily: null, projects: {}, plus: {}
   };
   for (const id in SKILLS) if (SKILLS[id].cls === o.cls && SKILLS[id].start) p.skills[id] = 1;
   p.inv = [{ id: 'hp_0', n: 3 }, { id: 'rs_0', n: 2 }, { id: 'scroll_town', n: 1 }];

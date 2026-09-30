@@ -3,8 +3,8 @@
 const ITEMS = {};
 function addItem(id, o) { ITEMS[id] = Object.assign({ id, type: 'misc', tier: 0, price: 5, stack: 99, desc: '', icon: '📦', stats: {}, req: 1 }, o); return ITEMS[id]; }
 
-const TIER_COL = ['#c9c9c9', '#7fd06a', '#5ab0ff', '#c77dff', '#ffb02e'];
-const TIER_LABEL = ['Обычное', 'Хорошее', 'Редкое', 'Эпическое', 'Легендарное'];
+const TIER_COL = ['#c9c9c9', '#5ab0ff', '#c77dff', '#ffb02e', '#ff4a6a'];
+const TIER_LABEL = ['Обычное', 'Редкое', 'Эпическое', 'Легендарное', 'Мифическое'];
 const T_REQ = [1, 5, 10, 15];
 
 /* Оружие: у каждого класса — своё, чужое надеть нельзя */
@@ -104,8 +104,8 @@ addItem('sealkey', { name: 'Печать Пепла (ключ)', type: 'quest', 
 
 /* ===== Питомцы (редкость: 0 обычный … 4 легендарный) ===== */
 const RARITY = [
-  { n: 'Обычный', c: '#c9c9c9', m: 1, ch: 1 }, { n: 'Необычный', c: '#7fd06a', m: 1.3, ch: 0.7 }, { n: 'Редкий', c: '#5ab0ff', m: 1.7, ch: 0.45 },
-  { n: 'Эпический', c: '#c77dff', m: 2.2, ch: 0.25 }, { n: 'Легендарный', c: '#ffb02e', m: 3, ch: 0.1 }
+  { n: 'Обычный', c: '#c9c9c9', m: 1, ch: 1 }, { n: 'Редкий', c: '#5ab0ff', m: 1.4, ch: 0.6 }, { n: 'Эпический', c: '#c77dff', m: 1.9, ch: 0.4 },
+  { n: 'Легендарный', c: '#ffb02e', m: 2.5, ch: 0.2 }, { n: 'Мифический', c: '#ff4a6a', m: 3.3, ch: 0.08 }
 ];
 const PETS = {
   fox: { name: 'Рыжий лисёнок', kind: 'quad', r: 0, col: '#d9793a', acc: '#fff3e0', hp: 40, dmg: 5, spd: 118, size: 0.55, perk: '+10% золота', mods: { gold: 0.1 }, price: 150, icon: '🦊' },

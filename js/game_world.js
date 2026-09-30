@@ -237,11 +237,11 @@ function nearbyInteractable() {
   const P = G.P; let best = null, bd = 1e9;
   if (G.fish) return { type: 'fishing', label: G.fish.state === 'bite' ? 'Подсечь!' : 'Ждать поклёвку… (E — убрать)', o: { x: P.x, y: P.y } };
   for (const n of G.npcs) { if (n.inside) continue; const d = Math.hypot(n.x - P.x, n.y - P.y); if (d < 68 && d < bd) { bd = d; best = { type: 'npc', n, label: `Поговорить: ${n.def.name}` }; } }
-  const objs = G.world.objs; const T_OK = { chest: 1, herb: 1, ore: 1, plot: 1, portal: 1, bed: 1, bin: 1, board: 1 };
+  const objs = G.world.objs; const T_OK = { chest: 1, herb: 1, ore: 1, plot: 1, portal: 1, door: 1, ibed: 1, table: 1, stove: 1, bin: 1, board: 1 };
   for (const o of objs) {
     if (!T_OK[o.t]) continue; if (Math.abs(o.x - P.x) > 64 || Math.abs(o.y - P.y) > 64) continue; if (o.cd > 0) continue;
-    if (o.t === 'chest' && G.opened.has(o.id)) continue; const d = Math.hypot(o.x - P.x, o.y - 8 - P.y), lim = o.t === 'plot' ? 30 : o.t === 'portal' ? 46 : 52;
-    if (d < lim && d < bd) { bd = d; const lab = { chest: 'Открыть сундук', herb: 'Собрать: Лунный корень', ore: 'Добыть: Железная руда', plot: plotLabel(o), portal: o.exit ? 'Выйти из подземелья' : `Войти: ${o.label} (рек. ур. ${o.lvl})`, bed: 'Лечь спать (после 18:00)', bin: 'Ящик отгрузки', board: 'Доска заказов' }; best = { type: o.t, o, label: lab[o.t] }; }
+    if (o.t === 'chest' && G.opened.has(o.id)) continue; if (o.t === 'table' && G.prof.flags.letter) continue; const d = Math.hypot(o.x - P.x, o.y - 8 - P.y), lim = o.t === 'plot' ? 30 : o.t === 'portal' ? 46 : 52;
+    if (d < lim && d < bd) { bd = d; const lab = { chest: 'Открыть сундук', herb: 'Собрать: Лунный корень', ore: 'Добыть: Железная руда', plot: plotLabel(o), portal: o.exit ? 'Выйти из подземелья' : `Войти: ${o.label} (рек. ур. ${o.lvl})`, door: o.label, ibed: 'Лечь спать (после 18:00)', table: 'Прочесть письмо деда', stove: 'Плита: готовить', bin: 'Ящик отгрузки', board: 'Доска заказов' }; best = { type: o.t, o, label: lab[o.t] }; }
   }
   if (!best || bd > 24) { const w = waterAhead(); if (w && (!best || best.type !== 'npc')) best = { type: 'water', o: w, label: 'Рыбачить (удочка)' }; }
   return best;
@@ -252,12 +252,15 @@ function interact() {
   else if (it.type === 'water') startFish(it.o);
   else if (it.type === 'plot') plotAction(it.o);
   else if (it.type === 'portal') usePortal(it.o);
-  else if (it.type === 'bed') sleepHome();
+  else if (it.type === 'door') { usePortal(it.o); if (it.o.exit) tutAdvance(2); }
+  else if (it.type === 'ibed') sleepHome();
+  else if (it.type === 'table') { G.prof.flags.letter = true; UI.showLetter(); tutAdvance(0); }
+  else if (it.type === 'stove') openCraft('cook', null);
   else if (it.type === 'bin') openBin();
   else if (it.type === 'board') openBoard();
   else if (it.type === 'npc') openDialog(it.n);
   else if (it.type === 'chest') {
-    const o = it.o; G.opened.add(o.id); G.prof.opened = Array.from(G.opened); Snd.play('pickup'); const g = Math.round(o.gold * G.S.gold); addGold(g); floatText(o.x, o.y - 30, `+${g}💰`, '#fd4'); (o.loot || []).forEach(([id, n]) => addItem(id, n)); logMsg(`Сундук открыт: +${g} золота`, 'good'); burst(o.x, o.y - 14, '#ffd23a', 16, 60);
+    const o = it.o; G.opened.add(o.id); if (o.id === 'home_chest') tutAdvance(1); G.prof.opened = Array.from(G.opened); Snd.play('pickup'); const g = Math.round(o.gold * G.S.gold); addGold(g); floatText(o.x, o.y - 30, `+${g}💰`, '#fd4'); (o.loot || []).forEach(([id, n]) => addItem(id, n)); logMsg(`Сундук открыт: +${g} золота`, 'good'); burst(o.x, o.y - 14, '#ffd23a', 16, 60);
   } else { const o = it.o; addItem(o.item, 1); o.cd = 1; Snd.play('pickup'); burst(o.x, o.y - 10, o.t === 'herb' ? '#6f6' : '#fc8', 10, 40); later(90, () => { o.cd = 0; }); }
 }
 
@@ -282,6 +285,7 @@ function saveGame(silent) {
 }
 function startGame(prof) {
   if (!G.world) { G.world = genWorld(); }
+  if (prof.flags.tut === undefined) prof.flags.tut = 6;
   prof.farm = prof.farm || {}; prof.projects = prof.projects || {}; prof.plus = prof.plus || {}; if (prof.version < 2 && !prof.quests.st1 && !prof.quests.mq1) prof.quests.st1 = { state: 'active', prog: [0], ready: false }; prof.version = 2;
   G.prof = prof; G.P = makePlayer(); G.P.buffs = []; G.min = prof.min || START_ABS_MIN; G.opened = new Set(prof.opened); G.revealed = decodeRevealed(prof.revealed);
   G.cd = {}; G.proj = []; G.fx = []; G.texts = []; G.areas = []; G.timers = []; G.lightning = []; G.log = []; G.dialog = null; G.shop = null; G.panel = null; G.paused = false; G.target = null; G.tourney = null; G.raid = null; G.fish = null; G.rainedToday = false; G.events = {}; G.potCd = { hp: 0, rs: 0 };
