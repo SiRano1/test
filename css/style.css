@@ -172,3 +172,5 @@ input:checked+.switch{background:#6a8a2a}input:checked+.switch:after{left:25px;b
 .modal{position:fixed;inset:0;z-index:160;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center}.modal-box,.story-box{background:var(--panel);border:3px solid var(--gold);border-radius:10px;padding:24px;max-width:520px;text-align:center}
 .story-box{max-width:640px;font-size:18px;line-height:1.6}.st-title{font-size:30px;color:var(--gold2)}
 @media(max-width:900px){.creator{flex-direction:column;overflow:auto}#h-quests{display:none!important}.best-grid{grid-template-columns:1fr}}
+.shop-detail .hint,.shop-detail .dim{color:#cbb98a!important}
+.srow .sp .btn{padding:3px 10px;font-size:13px}

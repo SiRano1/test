@@ -36,9 +36,11 @@ const enemies = () => G.mons.filter(m => !m.dead && !m.hidden);
 /* ---- создание монстров ---- */
 function makeMonster(sp, event) {
   const d = MON[sp.id], dif = { easy: 0.75, normal: 1, hard: 1.4 }[G.prof.difficulty] || 1, lm = sp.lvl - d.lvl[0];
-  const hp = Math.round(d.hp * (1 + lm * 0.25) * (dif > 1 ? 1.2 : dif < 1 ? 0.85 : 1));
-  const m = { kind: 'mon', id: sp.id, d, x: (sp.tx + 0.5) * TS, y: (sp.ty + 1) * TS - 4, hx: (sp.tx + 0.5) * TS, hy: (sp.ty + 1) * TS - 4, lvl: sp.lvl, hp, maxHp: hp, dmg: d.dmg * (1 + lm * 0.12) * dif, def: sp.lvl * 2, spd: d.spd, state: 'idle', cd: rand(0, 1), ang: rand(0, TAU), flip: false, moving: false, hurt: 0, dead: false, deadT: 0, wt: rand(1, 4), tx: 0, ty: 0, atk: null, stun: 0, root: 0, slow: 0, slowAmt: 1, dots: [], t0: rand(0, 10), boss: d.boss, event: event || null, sp, sp2: rand(4, 9), phase: 0 };
-  m.hidden = !!d.night && !isNight() && !event;
+  const elite = !d.boss && !d.passive && sp.lvl >= 3 && !sp.dg && Math.random() < 0.07, hpM = d.boss ? 1 : 1.7, dmM = d.boss ? 0.72 : 1.35;
+  const hp = Math.round(d.hp * hpM * (1 + lm * 0.3) * (elite ? 2.5 : 1) * (dif > 1 ? 1.25 : dif < 1 ? 0.85 : 1));
+  const m = { kind: 'mon', id: sp.id, d, x: (sp.tx + 0.5) * TS, y: (sp.ty + 1) * TS - 4, hx: (sp.tx + 0.5) * TS, hy: (sp.ty + 1) * TS - 4, lvl: sp.lvl, hp, maxHp: hp, dmg: d.dmg * dmM * (1 + lm * 0.15) * dif * (elite ? 1.4 : 1), elite, def: sp.lvl * 2, spd: d.spd, state: 'idle', cd: rand(0, 1), ang: rand(0, TAU), flip: false, moving: false, hurt: 0, dead: false, deadT: 0, wt: rand(1, 4), tx: 0, ty: 0, atk: null, stun: 0, root: 0, slow: 0, slowAmt: 1, dots: [], t0: rand(0, 10), boss: d.boss, event: event || null, sp, sp2: rand(4, 9), phase: 0 };
+  m.hidden = !!d.night && !isNight() && !event && sp.ty < OW_H;
+  if (elite) { m.name2 = 'Вожак: ' + d.name; }
   return m;
 }
 function spawnMonsters() {
@@ -64,10 +66,12 @@ function killPlayer() {
   if (G.tourney) { logMsg('Турнир проигран.', 'bad'); endTourney(false); }
 }
 function respawnPlayer() {
-  const P = G.P, p = G.prof, loss = Math.floor(p.gold * 0.1); p.gold -= loss;
-  P.dead = false; P.hp = P.maxHp * 0.5; P.res = P.maxRes * 0.5; P.x = 50 * TS + 16; P.y = 53 * TS; P.invuln = G.t + 3; P.buffs = []; recalc();
-  if (loss) logMsg(`Потеряно золота: ${loss}`, 'bad'); if (G.petEnt) { G.petEnt.x = P.x; G.petEnt.y = P.y; }
-  G.mons.forEach(m => { if (!m.dead && !m.boss) { m.state = 'idle'; } });
+  const P = G.P, p = G.prof, k = p.projects && p.projects.hospital ? 0.5 : 1, loss = Math.floor(p.gold * 0.25 * k), xpLoss = Math.floor(p.xp * 0.3 * k);
+  p.gold -= loss; p.xp = Math.max(0, p.xp - xpLoss);
+  P.dead = false; P.hp = P.maxHp * 0.4; P.res = P.maxRes * 0.4; P.x = 50 * TS + 16; P.y = 53 * TS; P.invuln = G.t + 3; P.buffs = [];
+  addBuff('weak', 'Слабость после смерти', '💀', { dmgPct: -0.15, defPct: -0.15 }, 240 * k); recalc();
+  if (loss || xpLoss) logMsg(`Потери: ${loss} золота, ${xpLoss} опыта. Слабость на ${Math.round(4 * k)} мин.`, 'bad'); if (G.petEnt) { G.petEnt.x = P.x; G.petEnt.y = P.y; }
+  G.mons.forEach(m => { if (!m.dead && !m.boss) { m.state = 'idle'; } if (m.boss && !m.dead && m.state === 'chase') { m.hp = m.maxHp; m.state = 'idle'; } });
   UI.hideDeath();
 }
 
@@ -112,8 +116,9 @@ function killMon(m) {
     if (Math.random() < Math.min(1, ch * (ch >= 1 ? 1 : luck))) addItem(id, 1);
   }
   const b = p.bestiary[m.id] || (p.bestiary[m.id] = { kills: 0 }); const first = b.kills === 0; b.kills++; if (first) { toast(`📖 Бестиарий: ${d.name}`, 'good'); logMsg(`Запись в бестиарии: ${d.name}`, 'good'); }
-  if (m.boss) { const key = m.sp.boss; if (key && !p.defeated.includes(key)) p.defeated.push(key); toast(`Победа: ${d.name}!`, 'good'); shake(8, 0.5); burst(m.x, m.y - 20, '#ffd23a', 40, 120); ringFx(m.x, m.y, '#ffd23a', 120, 0.6); Snd.play('levelup'); }
-  questKill(m.id); if (m.boss) questBoss(m.id);
+  if (m.boss) { const key = m.sp.boss, first = key && !p.defeated.includes(key); if (key && first) p.defeated.push(key); if (d.loot) { const wt = `w_${CLASSES[p.cls].weapon}_3`; if (first || Math.random() < 0.3) { addItem(wt, 1); toast(`🏆 Трофей босса: ${ITEMS[wt].name}`, 'good'); } } toast(`Победа: ${d.name}!`, 'good'); shake(8, 0.5); burst(m.x, m.y - 20, '#ffd23a', 40, 120); ringFx(m.x, m.y, '#ffd23a', 120, 0.6); Snd.play('levelup'); }
+  questKill(m.id); bountyKill(m.id); if (m.boss) questBoss(m.id);
+  if (m.elite) { addGold(Math.round(gold * 2)); if (Math.random() < 0.4) addItem('gem', 1); gainXp(xp); floatText(m.x, m.y - 60, 'Вожак повержен!', '#fd4', 'big'); }
   if (m.event === 'raid' && G.raid) G.raid.killed++; if (m.event === 'tourney' && G.tourney) tourneyCheck();
   const pd = activePetData(); if (pd) petGainXp(pd, Math.round(xp * 0.5));
   if (p.cls === 'hunter' && d.tame && Math.random() < [0.06, 0.045, 0.03, 0.02, 0.012][PETS[d.tame].r] * luck) { if (addPet(d.tame)) { toast(`🐾 Вы нашли детёныша: ${PETS[d.tame].name}!`, 'good'); Snd.play('tame'); } }
@@ -329,14 +334,16 @@ function updatePet(dt) {
 }
 
 /* ---- ИИ монстров ---- */
-function inTown(x, y) { const tx = x / TS, ty = y / TS; return tx > 34 && tx < 66 && ty > 33 && ty < 64; }
+function zoneBlock(x, y) { return y < OW_H * TS ? 'o' : Math.floor(x / (32 * TS)) + '_' + Math.floor((y - OW_H * TS) / (24 * TS)); }
+function inTown(x, y) { return isSafeTile(x / TS, y / TS); }
 function updateMonster(m, dt) {
   const P = G.P;
-  if (m.d.night) { const want = !isNight() && !m.event; if (want && !m.hidden) { m.hidden = true; } else if (!want && m.hidden) { m.hidden = false; m.hp = m.maxHp; } }
+  if (m.d.night) { const want = !isNight() && !m.event && m.hy < OW_H * TS; if (want && !m.hidden) { m.hidden = true; } else if (!want && m.hidden) { m.hidden = false; m.hp = m.maxHp; } }
   if (m.hidden) return;
   if (m.dead) { m.deadT += dt; if (m.respawnAt && G.t > m.respawnAt && Math.hypot(m.hx - P.x, m.hy - P.y) > 520) { m.dead = false; m.gone = false; m.hp = m.maxHp; m.x = m.hx; m.y = m.hy; m.state = 'idle'; m.dots = []; m.stun = m.root = m.slow = 0; m.deadT = 0; } return; }
   m.t0 += dt; m.hurt = Math.max(0, m.hurt - dt);
   const dP = Math.hypot(P.x - m.x, P.y - m.y);
+  if (zoneBlock(m.x, m.y) !== zoneBlock(P.x, P.y)) return;
   if (dP > 850 && !m.event) { if (Math.hypot(m.x - m.hx, m.y - m.hy) > 4) { m.x = lerp(m.x, m.hx, 0.05); m.y = lerp(m.y, m.hy, 0.05); } m.hp = Math.min(m.maxHp, m.hp + m.maxHp * 0.02 * dt); return; }
   if (m.dots.length) applyDots(m, dt); if (m.dead) return;
   if (m.atk) { m.atk.p += dt / m.atk.dur; if (!m.atk.done && m.atk.p >= m.atk.hitAt) { m.atk.done = true; m.atk.fn && m.atk.fn(); } if (m.atk.p >= 1) m.atk = null; }
@@ -369,7 +376,7 @@ function updateMonster(m, dt) {
         } };
       }
     }
-    if (d.boss) bossAI(m, dt, dist);
+    if (d.boss && !m.dead) bossAI(m, dt, dist);
   }
 }
 function wander(m, dt, spd, rooted) {
@@ -377,14 +384,14 @@ function wander(m, dt, spd, rooted) {
   if (m.walking && !rooted) { const dx = m.tx - m.x, dy = m.ty - m.y, d = Math.hypot(dx, dy); if (d > 6) { if (moveEntity(m, dx / d * spd * dt, dy / d * spd * dt, mRad(m), m.d.flying)) { m.moving = true; m.flip = dx < 0; m.ang = Math.atan2(dy, dx); } else m.walking = false; } else m.walking = false; }
 }
 function bossAI(m, dt, dist) {
-  m.sp2 -= dt; const P = G.P;
-  if (m.id === 'horak' && m.sp2 <= 0 && dist < 400) { m.sp2 = 7; const x = P.x, y = P.y; G.areas.push({ type: 'telegraph', x, y, r: 110, t0: G.t, dur: 1.1, color: '#f33', fn: () => { ringFx(x, y, '#c96', 110, 0.4); shake(8, 0.35); Snd.play('boom'); burst(x, y, '#a86', 24, 130); if (Math.hypot(G.P.x - x, G.P.y - y) < 110 + 8) { hurtPlayer(m.dmg * 1.5, m, { noDodge: true }); G.P.slowT = G.t + 1.5; } } }); m.atk = { p: 0, dur: 0.6, hitAt: 9, kind: 'slash' }; floatText(m.x, m.y - 90, 'ГРАХ!', '#f66', 'big'); }
-  if (m.id === 'malgrath') {
-    if (m.sp2 <= 0) { m.sp2 = 8; Snd.play('fire'); floatText(m.x, m.y - 90, 'Пепел!', '#f84', 'big'); const n = 14, base = rand(0, TAU); for (let i = 0; i < n; i++) fireProj({ team: 'e', x: m.x, y: m.y - 24, ang: base + i / n * TAU, speed: 240, r: 8, dmg: m.dmg * 0.8, color: '#ff6a1a', fire: true, life: 2.2, light: 90 }); ringFx(m.x, m.y, '#f84', 80, 0.5); }
-    m.summT = (m.summT || 12) - dt; if (m.summT <= 0) { m.summT = 22; if (G.mons.filter(x => !x.dead && x.id === 'cultist' && x.event === 'malg').length < 4) { floatText(m.x, m.y - 90, 'Ко мне, братья!', '#f84', 'big'); for (let i = 0; i < 2; i++) spawnEventMon('cultist', Math.floor(m.x / TS) + (i ? 2 : -2), Math.floor(m.y / TS) + 2, 14, 'malg'); Snd.play('cast'); } }
-    if (m.hp < m.maxHp * 0.4 && !m.enrage) { m.enrage = true; floatText(m.x, m.y - 100, 'ЯРОСТЬ ПЕПЛА!', '#f33', 'big'); Snd.play('roar'); shake(6, 0.5); }
-  }
-  if (m.id === 'direwolf') { if (m.sp2 <= 0) { m.sp2 = 14; floatText(m.x, m.y - 80, 'Аууу!', '#8cf', 'big'); Snd.play('roar'); for (let i = 0; i < 2; i++) spawnEventMon('wolf', Math.floor(m.x / TS) + i * 2 - 1, Math.floor(m.y / TS) + 1, 6, 'wolfnight'); } }
+  const P = G.P, ai = m.d.ai || []; m.aiT = m.aiT || ai.map(a => a.cd * 0.6);
+  if (m.hp < m.maxHp * 0.4 && !m.enrage) { m.enrage = true; floatText(m.x, m.y - 100, 'ЯРОСТЬ!', '#f33', 'big'); Snd.play('roar'); shake(6, 0.5); }
+  ai.forEach((a, i) => {
+    m.aiT[i] -= dt * (m.enrage ? 1.4 : 1); if (m.aiT[i] > 0) return; if (dist > 520 && a.t !== 'summon') return; m.aiT[i] = a.cd;
+    if (a.t === 'slam') { const x = P.x, y = P.y; G.areas.push({ type: 'telegraph', x, y, r: a.r, t0: G.t, dur: 1.1, color: '#f33', fn: () => { ringFx(x, y, '#c96', a.r, 0.4); shake(8, 0.35); Snd.play('boom'); burst(x, y, '#a86', 24, 130); if (!m.dead && Math.hypot(G.P.x - x, G.P.y - y) < a.r + 8) { hurtPlayer(m.dmg * 1.5, m, { noDodge: true }); G.P.slowT = G.t + 1.5; } } }); floatText(m.x, m.y - 90, 'Удар!', '#f66', 'big'); }
+    else if (a.t === 'nova') { Snd.play(a.fire ? 'fire' : 'cast'); floatText(m.x, m.y - 90, 'Волна!', a.col || '#f84', 'big'); const n = a.n || 12, base = rand(0, TAU); for (let k = 0; k < n; k++) fireProj({ team: 'e', x: m.x, y: m.y - 24, ang: base + k / n * TAU, speed: 240, r: 8, dmg: m.dmg * 0.8, color: a.col || '#ff6a1a', fire: !!a.fire, life: 2.2, light: 90 }); ringFx(m.x, m.y, a.col || '#f84', 80, 0.5); }
+    else if (a.t === 'summon') { const alive = G.mons.filter(x => !x.dead && x.id === a.id && x.event === 'bossadd').length; if (alive >= (a.max || 4)) return; floatText(m.x, m.y - 90, 'Ко мне!', '#f84', 'big'); Snd.play('cast'); for (let k = 0; k < (a.n || 2); k++) { const tx = Math.floor(m.x / TS) + (k ? 2 : -2), ty = Math.floor(m.y / TS) + 2, q = G.world.nearestWalk(tx, ty) || [tx, ty]; const e = spawnEventMon(a.id, q[0], q[1], Math.max(MON[a.id].lvl[0], m.lvl - 2), 'bossadd'); e.hx = m.x; e.hy = m.y; } }
+  });
 }
 
 /* ---- зоны на земле (ловушки, лозы, телеграфы) ---- */

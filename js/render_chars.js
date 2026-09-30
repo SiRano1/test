@@ -39,6 +39,10 @@ const MSTYLES = {
   horak: { top: '#5a4a3a', bottom: '#3a3020', boots: '#2a2010', hat: 'crown', hatCol: '#8a8a8a', wp: 'club', bulky: true, horns: true },
   malgrath: { top: '#3a0f0f', bottom: '#2a0808', boots: '#1a0505', robe: true, hat: 'horns', hatCol: '#1a1010', wp: 'staff', fire: true },
   skeleton: { top: '#d8d0b8', bottom: '#c8c0a8', boots: '#b8b098', skeleton: true, wp: 'sword' },
+  lichking: { top: '#3a2a5a', bottom: '#3a2a5a', boots: '#2a1a4a', robe: true, skeleton: true, hat: 'crown', hatCol: '#8a8a8a', wp: 'staff', fire: true },
+  frostgiant: { top: '#6a8ab0', bottom: '#4a6a90', boots: '#3a4a60', bulky: true, hat: 'horns', hatCol: '#8ab', wp: 'club' },
+  witch: { top: '#3a4a2a', bottom: '#2a3a20', boots: '#1a2a10', robe: true, hat: 'wizard', hatCol: '#2a3a20', wp: 'staff' },
+  skar: { top: '#5a2a20', bottom: '#3a2a20', boots: '#2a1a10', hat: 'bandana', hatCol: '#222', bulky: true, wp: 'sword' },
   skmage: { top: '#3a2a5a', bottom: '#3a2a5a', boots: '#2a1a4a', robe: true, skeleton: true, hat: 'hood', hatCol: '#3a2a5a', wp: 'staff' }
 };
 

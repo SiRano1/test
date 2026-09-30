@@ -55,7 +55,7 @@ function update(dt) {
   const pm = Math.floor(G.min); G.min += dt * G.timeScale; const cm = Math.floor(G.min); for (let i = pm + 1; i <= cm; i++) onMinute();
   updateWeather(dt);
   for (let i = G.timers.length - 1; i >= 0; i--) if (G.t >= G.timers[i].at) { const f = G.timers[i].fn; G.timers.splice(i, 1); f(); }
-  updatePlayer(dt); updatePet(dt);
+  updatePlayer(dt); updatePet(dt); updateFish(dt);
   for (const n of G.npcs) updateNPC(n, dt);
   for (const m of G.mons) updateMonster(m, dt);
   for (let i = G.mons.length - 1; i >= 0; i--) { const m = G.mons[i]; if (m.dead && m.deadT > 2.5 && m.event) G.mons.splice(i, 1); }
@@ -76,7 +76,7 @@ function update(dt) {
   const z = G.cam.zoom, vw = window.innerWidth / z, vh = window.innerHeight / z;
   const tx = P.x - vw / 2, ty = P.y - 14 - vh / 2; G.cam.x = lerp(G.cam.x, tx, Math.min(1, dt * 8)); G.cam.y = lerp(G.cam.y, ty, Math.min(1, dt * 8));
   if (Math.abs(G.cam.x - tx) > vw) G.cam.x = tx; if (Math.abs(G.cam.y - ty) > vh) G.cam.y = ty;
-  G.cam.x = clamp(G.cam.x, -40, WW * TS - vw + 40); G.cam.y = clamp(G.cam.y, -40, WH * TS - vh + 40);
+  const inDg = P.y >= OW_H * TS; G.cam.x = clamp(G.cam.x, -40, WW * TS - vw + 40); G.cam.y = clamp(G.cam.y, inDg ? OW_H * TS - 40 : -40, inDg ? WH * TS - vh + 40 : OW_H * TS - vh + 40);
   G.mouse.wx = G.cam.x + G.mouse.x / z; G.mouse.wy = G.cam.y + G.mouse.y / z;
 }
 let _revT = 0, _miniT = 0;
@@ -101,7 +101,7 @@ function drawPlayerEnt(c, P) {
 function drawMonsterEnt(c, m) {
   if (m.hidden || m.gone) return; const d = m.d; let alpha = 1; if (m.dead) alpha = Math.max(0, 1 - Math.max(0, m.deadT - 1.2)); if (alpha <= 0) return;
   if (d.night) alpha *= 0.85;
-  const aura = m.boss ? 'rgba(255,60,40,0.22)' : (m.enrage ? 'rgba(255,0,0,0.3)' : (m.stun > G.t ? 'rgba(255,255,100,0.3)' : m.root > G.t ? 'rgba(80,200,80,0.3)' : m.slow > G.t ? 'rgba(120,200,255,0.3)' : null));
+  const aura = m.elite ? 'rgba(255,210,60,0.3)' : m.boss ? 'rgba(255,60,40,0.22)' : (m.enrage ? 'rgba(255,0,0,0.3)' : (m.stun > G.t ? 'rgba(255,255,100,0.3)' : m.root > G.t ? 'rgba(80,200,80,0.3)' : m.slow > G.t ? 'rgba(120,200,255,0.3)' : null));
   const dead = m.dead ? Math.min(1, m.deadT * 2.5) : 0, atk = m.atk ? { kind: m.atk.kind || 'slash', p: Math.max(0, m.atk.p) } : null;
   if (d.kind === 'human' || d.kind === 'skeleton') {
     drawHuman(c, { x: m.x, y: m.y, dir: 'side', flip: m.flip, look: { skin: 0, hairStyle: d.kind === 'skeleton' ? 5 : 0, hair: 0, eye: 0, accent: 0, face: 0 }, race: 'human', gender: 'male', mon: m.id, custom: { skin: d.skin || (d.kind === 'skeleton' ? d.col : undefined), hair: d.hair }, hairless: d.kind === 'skeleton', sizeMul: d.size, t: m.t0, moving: m.moving, atk, hurt: m.hurt, dead, alpha, aura, style: null });
@@ -113,7 +113,7 @@ function drawMonsterEnt(c, m) {
   if (!m.dead && (m.hp < m.maxHp || m.boss) && (G.t - (m.lastHit || -99) < 6 || m === G.target)) {
     const w = 34 * Math.max(0.8, d.size * 0.9), y = m.y - 36 * d.size - (d.kind === 'human' ? 8 : 4);
     c.fillStyle = 'rgba(0,0,0,0.7)'; c.fillRect(m.x - w / 2 - 1, y - 1, w + 2, 7); c.fillStyle = m.boss ? '#c33' : '#d44'; c.fillRect(m.x - w / 2, y, w * clamp(m.hp / m.maxHp, 0, 1), 5);
-    c.font = 'bold 10px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = m.lvl > G.prof.lvl + 2 ? '#f77' : m.lvl < G.prof.lvl - 3 ? '#aaa' : '#ffe'; c.strokeStyle = '#000'; c.lineWidth = 3; const txt = `${d.name} · ур.${m.lvl}`; c.strokeText(txt, m.x, y - 3); c.fillText(txt, m.x, y - 3); c.textAlign = 'left';
+    c.font = 'bold 10px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = m.lvl > G.prof.lvl + 2 ? '#f77' : m.lvl < G.prof.lvl - 3 ? '#aaa' : '#ffe'; c.strokeStyle = '#000'; c.lineWidth = 3; const txt = `${m.name2 || d.name} · ур.${m.lvl}`; c.strokeText(txt, m.x, y - 3); c.fillText(txt, m.x, y - 3); c.textAlign = 'left';
   }
 }
 function drawPetEnt(c, pe) {
@@ -149,16 +149,16 @@ function renderScene(play) {
   const d = gt(), season = d.season, w = G.world, t = G.at, night = nightAmount();
   const x0 = Math.max(0, Math.floor(camx / TS)), y0 = Math.max(0, Math.floor(camy / TS)), x1 = Math.min(WW - 1, Math.ceil((camx + vw) / TS)), y1 = Math.min(WH - 1, Math.ceil((camy + vh) / TS));
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) drawTile(c, w, x, y, t, season);
-  const state = { night, season, opened: G.opened, hilite: G.hint && G.hint.type === 'chest' ? G.hint.o : null };
+  const state = { night, season, opened: G.opened, farm: G.prof ? G.prof.farm : null, hilite: G.hint && G.hint.type === 'chest' ? G.hint.o : null };
   // земля: зоны
   if (play) for (const a of G.areas) drawArea(c, a);
   const dr = [];
-  const pad = 80;
-  for (const o of w.objs) { if (o.x < camx - pad || o.x > camx + vw + pad || o.y < camy - 40 || o.y > camy + vh + 120) continue; if (o.t === 'chest' || true) dr.push({ y: o.y, f: () => drawObj(c, o, t, season, Object.assign({}, state, { hilite: G.hint && G.hint.o === o })) }); }
+  const pad = 80, zb = play ? zoneBlock(G.P.x, G.P.y) : 'o';
+  for (const o of w.objs) { if (zoneBlock(o.x, o.y) !== zb) continue; if (o.x < camx - pad || o.x > camx + vw + pad || o.y < camy - 40 || o.y > camy + vh + 120) continue; if (o.t === 'chest' || true) dr.push({ y: o.y, f: () => drawObj(c, o, t, season, Object.assign({}, state, { hilite: G.hint && G.hint.o === o })) }); }
   for (const b of w.buildings) { const by = (b.y + b.h) * TS; if (by < camy - 60 || (b.y * TS - 200) > camy + vh || (b.x + b.w) * TS < camx - 40 || b.x * TS > camx + vw + 40) continue; dr.push({ y: by - 1, f: () => drawBuilding(c, b, t, state) }); }
   if (play) {
     for (const n of G.npcs) if (!n.inside) dr.push({ y: n.y, f: () => drawNpcEnt(c, n) });
-    for (const m of G.mons) { if (m.hidden || m.gone) continue; if (m.x < camx - 100 || m.x > camx + vw + 100 || m.y < camy - 100 || m.y > camy + vh + 140) continue; dr.push({ y: m.y - (m.dead ? 8 : 0), f: () => drawMonsterEnt(c, m) }); }
+    for (const m of G.mons) { if (m.hidden || m.gone || zoneBlock(m.x, m.y) !== zb) continue; if (m.x < camx - 100 || m.x > camx + vw + 100 || m.y < camy - 100 || m.y > camy + vh + 140) continue; dr.push({ y: m.y - (m.dead ? 8 : 0), f: () => drawMonsterEnt(c, m) }); }
     if (G.petEnt) dr.push({ y: G.petEnt.y, f: () => drawPetEnt(c, G.petEnt) });
     dr.push({ y: G.P.y + 0.1, f: () => drawPlayerEnt(c, G.P) });
     for (const pr of G.proj) dr.push({ y: pr.y + 10, f: () => drawProj(c, pr) });
@@ -167,23 +167,30 @@ function renderScene(play) {
   if (play) {
     for (const f of G.fx) drawFx(c, f);
     for (const l of G.lightning) drawLightning(c, l);
-    drawFireworks(c);
+    drawFireworks(c); drawFishing(c);
     // индикатор цели интерактива
     if (G.hint && !G.paused) { const o = G.hint.n || G.hint.o; const yy = (G.hint.n ? o.y - 70 : o.y - 40) + Math.sin(G.at * 5) * 2; c.font = 'bold 12px Georgia, serif'; c.textAlign = 'center'; c.fillStyle = '#fff'; c.strokeStyle = '#000'; c.lineWidth = 3; const tx = '[E] ' + G.hint.label; c.strokeText(tx, o.x, yy); c.fillText(tx, o.x, yy); c.textAlign = 'left'; }
     for (const tx of G.texts) { const a = clamp(1 - (tx.t - tx.life * 0.6) / (tx.life * 0.4), 0, 1); c.globalAlpha = a; const big = tx.size === 'big'; c.font = `bold ${big ? 18 : 13}px Georgia, serif`; c.textAlign = 'center'; c.strokeStyle = '#000'; c.lineWidth = 3; c.strokeText(tx.text, tx.x, tx.y); c.fillStyle = tx.color; c.fillText(tx.text, tx.x, tx.y); c.globalAlpha = 1; c.textAlign = 'left'; }
   }
   // освещение
-  const amb = ambientAt(d.hf); const lights = w.lights.slice();
-  if (play) { const P = G.P; lights.push({ x: P.x, y: P.y - 14, r: night > 0.3 ? 170 : 60, noglow: true, a: 0.9 }); for (const pr of G.proj) if (pr.light) lights.push({ x: pr.x, y: pr.y, r: pr.light, a: 0.9 }); for (const m of G.mons) if (m.boss && !m.dead) lights.push({ x: m.x, y: m.y - 20, r: 110, noglow: true, a: 0.7 }); }
+  const inDg = play && G.P.y >= OW_H * TS; const amb = inDg ? [8, 10, 26, 0.68] : ambientAt(d.hf); const lights = w.lights.filter(l => zoneBlock(l.x, l.y) === zb);
+  if (play) { const P = G.P; lights.push({ x: P.x, y: P.y - 14, r: (night > 0.3 || inDg) ? 180 : 60, noglow: true, a: 0.95 }); for (const pr of G.proj) if (pr.light) lights.push({ x: pr.x, y: pr.y, r: pr.light, a: 0.9 }); for (const m of G.mons) if (m.boss && !m.dead && zoneBlock(m.x, m.y) === zb) lights.push({ x: m.x, y: m.y - 20, r: 110, noglow: true, a: 0.7 }); }
   const lf = { a: 0 };
   if (G.events.festival && night > 0.3) { for (let i = 0; i < 8; i++) lights.push({ x: (44 + i * 1.8) * TS, y: 45 * TS, r: 70 }); }
-  drawLighting(c, cw, ch, cam, lights, amb, G.weather.amt, dpr);
-  drawWeather(c, cw, ch, G.at, G.weather.kind, G.weather.amt, dpr);
+  drawLighting(c, cw, ch, cam, lights, amb, inDg ? 0 : G.weather.amt, dpr);
+  if (!inDg) drawWeather(c, cw, ch, G.at, G.weather.kind, G.weather.amt, dpr);
   // виньетка
   c.setTransform(1, 0, 0, 1, 0, 0); const gr = c.createRadialGradient(cw / 2, ch / 2, Math.min(cw, ch) * 0.35, cw / 2, ch / 2, Math.max(cw, ch) * 0.75); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.42)'); c.fillStyle = gr; c.fillRect(0, 0, cw, ch);
   if (play && G.P.hp / G.P.maxHp < 0.3 && !G.P.dead) { c.fillStyle = `rgba(160,0,0,${0.15 + 0.1 * Math.sin(G.at * 5)})`; c.fillRect(0, 0, cw, ch); }
   if (play && G.P.hurt > 0) { c.fillStyle = `rgba(200,0,0,${G.P.hurt})`; c.fillRect(0, 0, cw, ch); }
   if (play && G.P.dead) { c.fillStyle = 'rgba(30,0,0,0.55)'; c.fillRect(0, 0, cw, ch); }
+}
+function drawFishing(c) {
+  const f = G.fish; if (!f) return; const P = G.P, by = f.by + Math.sin(G.at * 3) * (f.state === 'bite' ? 3 : 1);
+  c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 1; c.beginPath(); c.moveTo(P.x + (P.flip ? -8 : 8), P.y - 20); c.quadraticCurveTo((P.x + f.bx) / 2, Math.min(P.y, by) - 30, f.bx, by); c.stroke();
+  c.fillStyle = '#e33'; c.beginPath(); c.arc(f.bx, by, 3, 0, TAU); c.fill(); c.fillStyle = '#fff'; c.fillRect(f.bx - 3, by, 6, 1.5);
+  if (f.state === 'bite') { c.font = 'bold 22px Georgia'; c.textAlign = 'center'; c.fillStyle = '#f44'; c.strokeStyle = '#000'; c.lineWidth = 3; c.strokeText('!', f.bx, by - 14); c.fillText('!', f.bx, by - 14); c.textAlign = 'left'; }
+  c.strokeStyle = 'rgba(255,255,255,0.5)'; c.beginPath(); c.ellipse(f.bx, by + 2, 8 + Math.sin(G.at * 4) * 2, 3, 0, 0, TAU); c.stroke();
 }
 function drawArea(c, a) {
   if (a.type === 'telegraph') { const p = clamp((G.t - a.t0) / a.dur, 0, 1); c.fillStyle = `rgba(255,60,30,${0.15 + 0.15 * Math.sin(G.at * 14)})`; c.beginPath(); c.arc(a.x, a.y, a.r, 0, TAU); c.fill(); c.strokeStyle = 'rgba(255,90,50,0.9)'; c.lineWidth = 2; c.beginPath(); c.arc(a.x, a.y, a.r, 0, TAU); c.stroke(); c.fillStyle = 'rgba(255,80,40,0.25)'; c.beginPath(); c.arc(a.x, a.y, a.r * p, 0, TAU); c.fill(); if (a.meteor) { const yy = a.y - (1 - p) * 320; c.fillStyle = '#ff8a2a'; c.beginPath(); c.arc(a.x, yy, 16, 0, TAU); c.fill(); c.fillStyle = '#ffe27a'; c.beginPath(); c.arc(a.x, yy, 8, 0, TAU); c.fill(); c.fillStyle = 'rgba(255,120,30,0.5)'; c.fillRect(a.x - 6, yy - 60, 12, 60); } }

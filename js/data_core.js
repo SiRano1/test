@@ -176,5 +176,5 @@ function calc(minTotal) {
   };
 }
 function moonIcon(day) { const p = ((day - 14 + 28) % 28) / 28; return p < 0.06 || p > 0.94 ? '🌕' : p < 0.25 ? '🌖' : p < 0.4 ? '🌗' : p < 0.6 ? '🌑' : p < 0.75 ? '🌒' : '🌓'; }
-function xpNeed(l) { return Math.floor(25 * Math.pow(l, 1.5)); }
+function xpNeed(l) { return Math.floor(38 * Math.pow(l, 1.6)); }
 const MAX_LEVEL = 20;

@@ -1,6 +1,6 @@
 'use strict';
 /* ===== Генерация открытого мира ===== */
-const WW = 100, WH = 100, TS = 32;
+const WW = 100, WH = 150, OW_H = 100, TS = 32;
 const T = { DEEP: 0, SHALLOW: 1, SAND: 2, GRASS: 3, FOREST: 4, ROCK: 5, SNOW: 6, ASH: 7, ROAD: 8, SWAMP: 9, PLAZA: 10, ARENA: 11, BRIDGE: 12, FLOOR: 13 };
 const TILE_COL = { 0: '#1f4f8f', 1: '#4c9ad0', 2: '#e2cf8f', 3: '#5c9a3c', 4: '#457a30', 5: '#6b6f78', 6: '#eef4fa', 7: '#3c3636', 8: '#b8996a', 9: '#3f5a3a', 10: '#b0a48c', 11: '#c9a86a', 12: '#8a6a3c', 13: '#5a5860' };
 
@@ -18,6 +18,7 @@ const BUILDINGS_DEF = [
   ['hamshop', 'shop', 75, 54, 5, 3, '#6a5a3a', '🏪 Лавка'], ['hamA', 'house', 70, 58, 4, 3, '#7a4a3a', ''], ['hamB', 'house', 81, 58, 4, 3, '#5a6a4a', ''], ['hamC', 'house', 72, 63, 4, 3, '#6a4a5a', ''],
   ['tower', 'tower', 68, 22, 5, 4, '#4a4a8a', '🗼 Башня Лунного Света'],
   ['keep', 'keep', 85, 4, 9, 4, '#4a1a1a', '🌋 Пепельная крепость'],
+  ['farmhouse', 'house', 35, 70, 5, 3, '#7a5a3a', ''],
   ['ruinA', 'ruin', 27, 26, 4, 3, '#5a5650', ''], ['ruinB', 'ruin', 32, 27, 3, 2, '#5a5650', '']
 ];
 const WORLD_SPAWN = { x: 50, y: 53 };
@@ -32,8 +33,9 @@ function genWorld(seed = 1337) {
   const near = (x, y, l, r) => Math.hypot(x - l.x, y - l.y) < r;
 
   /* --- базовый рельеф --- */
-  for (let y = 0; y < WH; y++) for (let x = 0; x < WW; x++) {
-    const edge = Math.min(x, y, WW - 1 - x, WH - 1 - y);
+  for (let y = OW_H; y < WH; y++) for (let x = 0; x < WW; x++) w.tiles[I(x, y)] = T.ROCK;
+  for (let y = 0; y < OW_H; y++) for (let x = 0; x < WW; x++) {
+    const edge = Math.min(x, y, WW - 1 - x, OW_H - 1 - y);
     const n1 = fbm(x / 9, y / 9, seed), mt = fbm(x / 12, y / 12, seed + 21), mo = fbm(x / 15 + 40, y / 15, seed + 9);
     let t = T.GRASS;
     if (y < 17 + n1 * 4) t = T.SNOW;
@@ -74,7 +76,7 @@ function genWorld(seed = 1337) {
   clearArea(L.scout.x, L.scout.y, 5, T.FOREST); clearArea(L.tower.x, L.tower.y + 1, 7, T.GRASS);
   clearArea(L.bandits.x, L.bandits.y, 8, T.FOREST); clearArea(L.ruins.x + 2, L.ruins.y + 3, 9, T.GRASS);
   rectTiles(28, 32, 36, 37, T.GRASS);
-  clearArea(L.meadow.x, L.meadow.y, 7, T.GRASS); clearArea(L.farm.x, L.farm.y, 6, T.GRASS);
+  clearArea(L.meadow.x, L.meadow.y, 7, T.GRASS); clearArea(L.farm.x, L.farm.y, 6, T.GRASS); rectTiles(33, 66, 52, 82, T.GRASS);
   rectTiles(44, 3, 56, 15, T.FLOOR); rectTiles(42, 8, 58, 14, T.FLOOR);
   rectTiles(82, 3, 96, 19, T.ASH); clearArea(89, 12, 6, T.FLOOR);
   clearArea(62, 67, 6, T.ARENA);
@@ -110,6 +112,9 @@ function genWorld(seed = 1337) {
   // ключевые точки должны быть проходимы
   Object.values(SPOTS).forEach(([x, y]) => { ensureLand(x, y, T.ROAD); });
 
+  /* --- Входы в подземелья --- */
+  DUNGEONS.forEach(d => { const [ex, ey] = d.entrance; rectTiles(ex - 1, ey - 1, ex + 1, ey + 1, T.ROAD); SPOTS['dg_' + d.id] = [ex, ey]; });
+  carve(71, 66, 74, 59); carve(38, 14, 50, 17); carve(26, 84, 36, 79); carve(33, 36, 33, 45);
   /* --- Объекты --- */
   const occupied = new Set();
   const occ = (x, y) => occupied.has(x + ',' + y);
@@ -126,7 +131,7 @@ function genWorld(seed = 1337) {
   const inTown = (x, y) => x >= 34 && x <= 66 && y >= 33 && y <= 64;
 
   // Деревья, кусты, цветы, камни
-  for (let y = 2; y < WH - 2; y++) for (let x = 2; x < WW - 2; x++) {
+  for (let y = 2; y < OW_H - 2; y++) for (let x = 2; x < WW - 2; x++) {
     const c = get(x, y), r = hash2(x, y, seed + 5), r2 = hash2(x, y, seed + 6);
     if (w.blk[I(x, y)] || occ(x, y) || inTown(x, y) && (c !== T.GRASS || nearRoad(x, y, 1))) continue;
     if (c === T.DEEP || c === T.BRIDGE || c === T.ROAD || c === T.PLAZA || c === T.ARENA || c === T.FLOOR) continue;
@@ -191,9 +196,9 @@ function genWorld(seed = 1337) {
   addObj('brazier', 67, 27, { block: true, light: 150 }); addObj('brazier', 73, 27, { block: true, light: 150 });
   addObj('well', 79, 62, { block: true }); addObj('lamp', 76, 57, { block: true, light: 130 }); addObj('lamp', 79, 57, { block: true, light: 130 });
   // Ферма
-  addObj('hay', 41, 69, { block: true }); addObj('hay', 46, 69, { block: true }); addObj('cart', 44, 73, { block: true });
-  for (let x = 40; x <= 47; x++) if (x !== 43 && x !== 44) addObj('crop', x, 74, {});
-  for (let x = 40; x <= 47; x++) addObj('crop', x, 75, {});
+  addObj('hay', 41, 69, { block: true }); addObj('hay', 46, 69, { block: true }); addObj('cart', 48, 73, { block: true });
+  for (let y = 75; y <= 78; y++) for (let x = 38; x <= 45; x++) addObj('plot', x, y, { key: x + ',' + y });
+  addObj('bed', 38, 73, {}); addObj('bin', 40, 73, { block: true }); addObj('board', 44, 47, { block: true });
   // Собака Бублик
   addObj('dog', 52, 82, {});
 
@@ -209,6 +214,25 @@ function genWorld(seed = 1337) {
   gather('herb', 'moonroot', 4, (x, y) => get(x, y) === T.GRASS && x < 40 && y < 46 && get(x, y) !== T.SAND);
   gather('ore', 'iron_ore', 12, (x, y) => { const c = get(x, y); return (c === T.GRASS || c === T.SNOW) && y > 12 && y < 40 && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(d => get(x + d[0], y + d[1]) === T.ROCK); });
 
+  /* --- Подземелья --- */
+  const DG_ROOMS = [[2, 9, 8, 15], [11, 3, 19, 10], [11, 13, 19, 20], [22, 5, 30, 18]]; // вход, комната A, комната B, босс
+  const DG_CORR = [[9, 11, 10, 6], [9, 13, 10, 17], [19, 5, 21, 8], [19, 17, 21, 14]];
+  const dgSpawns = [];
+  DUNGEONS.forEach(d => {
+    const X = (x) => d.x0 + x, Y = (y) => d.y0 + y;
+    DG_ROOMS.forEach(r => rectTiles(X(r[0]), Y(r[1]), X(r[2]), Y(r[3]), T.FLOOR));
+    DG_CORR.forEach(c => { const [ax, ay, bx, by] = c; const x0 = Math.min(ax, bx), x1 = Math.max(ax, bx), y0 = Math.min(ay, by), y1 = Math.max(ay, by); rectTiles(X(ax), Y(Math.min(ay, by)), X(ax + (bx > ax ? 1 : 0)), Y(Math.max(ay, by)), T.FLOOR); rectTiles(X(Math.min(ax, bx)), Y(by), X(Math.max(ax, bx)), Y(by + 1), T.FLOOR); rectTiles(X(Math.min(ax, bx)), Y(ay), X(Math.max(ax, bx)), Y(ay + 1), T.FLOOR); });
+    d.entry = [X(4), Y(12)];
+    addObj('portal', X(3), Y(12), { dest: [d.entrance[0], d.entrance[1] + 2], label: 'Выход', exit: true, light: 120, dg: d.id });
+    for (const [rx, ry] of [[3, 10], [7, 10], [12, 4], [18, 4], [12, 19], [18, 19], [23, 6], [29, 6], [23, 17], [29, 17]]) addObj('brazier', X(rx), Y(ry), { block: true, light: 150 });
+    const c = addObj('chest', X(29), Y(11), { block: true, id: 'dg_' + d.id, loot: d.loot, gold: d.gold }); w.chests.push(c);
+    const c2 = addObj('chest', X(18), Y(16), { block: true, id: 'dg2_' + d.id, loot: [['hp_1', 2], ['rs_1', 1]], gold: Math.round(d.gold / 3) }); w.chests.push(c2);
+    const pos = (r) => [DG_ROOMS[r][0] + 1 + Math.floor(rng() * (DG_ROOMS[r][2] - DG_ROOMS[r][0] - 1)), DG_ROOMS[r][1] + 1 + Math.floor(rng() * (DG_ROOMS[r][3] - DG_ROOMS[r][1] - 1))];
+    let k = 0; d.mobs.forEach(([id, n]) => { for (let i = 0; i < n; i++) { const [rx, ry] = pos(1 + (k++ % 2)); const m = MON[id]; dgSpawns.push({ id, tx: X(rx), ty: Y(ry), lvl: Math.max(m.lvl[0], d.lvl + Math.floor(rng() * 3)), dg: d.id }); } });
+    dgSpawns.push({ id: d.boss, tx: X(26), ty: Y(11), lvl: MON[d.boss].lvl[0], boss: d.boss, dg: d.id });
+    const [ex, ey] = d.entrance; addObj('portal', ex, ey, { dest: [X(4), Y(12)], label: d.name, light: 130, dg: d.id, lvl: d.lvl });
+  });
+
   /* --- Спавны монстров --- */
   const zoneAt = (x, y) => { const c = get(x, y); return c === T.SNOW ? 'snow' : c === T.ROCK ? 'mountain' : c === T.ASH ? 'ash' : c === T.SWAMP ? 'swamp' : c === T.FOREST ? 'forest' : (c === T.GRASS || c === T.SAND || c === T.ROAD || c === T.FLOOR) ? 'plains' : null; };
   const TABLE = {
@@ -218,11 +242,11 @@ function genWorld(seed = 1337) {
     ash: [['cultist', 3], ['golem', 1.5]], swamp: [['slime', 3], ['goblin', 2], ['spider', 1]]
   };
   const pickW = list => { const tot = list.reduce((s, e) => s + e[1], 0); let r = rng() * tot; for (const e of list) { if ((r -= e[1]) <= 0) return e[0]; } return list[0][0]; };
-  for (let cy = 4; cy < WH - 4; cy += 6) for (let cx = 4; cx < WW - 4; cx += 6) {
+  for (let cy = 4; cy < OW_H - 4; cy += 6) for (let cx = 4; cx < WW - 4; cx += 6) {
     const x = cx + Math.floor(rng() * 6), y = cy + Math.floor(rng() * 6);
-    if (!walkable(x, y) || occ(x, y) || inTown(x, y) || Math.hypot(x - 50, y - 50) < 15) continue;
+    if (!walkable(x, y) || occ(x, y) || inTown(x, y) || isSafeTile(x, y) || Math.hypot(x - 50, y - 50) < 15) continue;
     if (Object.values(LOCS).some(l => l !== LOCS.town && l !== LOCS.whisper && l !== LOCS.peaks && l !== LOCS.lake && Math.hypot(l.x - x, l.y - y) < l.r + 2 && ['hamlet', 'scout', 'tower', 'arena', 'meadow'].some(k => LOCS[k] === l))) continue;
-    if (rng() < 0.25) continue;
+    if (rng() < 0.08) continue;
     const z = zoneAt(x, y); if (!z) continue;
     const d = Math.hypot(x - 50, y - 50), allowed = 1 + d / 4;
     const opts = TABLE[z].filter(e => MON[e[0]].lvl[0] <= allowed && (MON[e[0]].night ? true : true));
@@ -236,13 +260,15 @@ function genWorld(seed = 1337) {
   ring('skeleton', 30, 33, 8, 5); ring('skmage', 30, 32, 2, 4); ring('wraith', 30, 34, 3, 6);
   ring('troll', 50, 9, 3, 5); sp('horak', 50, 8, { boss: 'horak' }); ring('snowwolf', 48, 12, 2, 4);
   ring('cultist', 89, 13, 7, 6); ring('golem', 89, 12, 3, 5); sp('malgrath', 89, 10, { boss: 'malgrath' });
-  ring('fox', 52, 82, 3, 4); ring('hawk', 52, 80, 1, 3); ring('boar', 43, 71, 5, 5); ring('rat', 44, 66, 5, 5);
+  ring('fox', 52, 82, 3, 4); ring('hawk', 52, 80, 1, 3); ring('boar', 54, 74, 5, 5); ring('rat', 33, 64, 4, 4); ring('rat', 56, 68, 3, 4);
   sp('bear', 72, 44); sp('bear', 68, 34); sp('bear', 40, 24); sp('bear', 60, 20);
   sp('stag', 74, 40, { rare: true }); sp('panther', 80, 44, { rare: true }); sp('panther', 70, 55, { rare: true }); sp('drake', 60, 6, { rare: true }); sp('griffin', 38, 9, { rare: true });
   ring('slime', 22, 82, 4, 6); ring('goblin', 22, 80, 3, 5); ring('spider', 74, 50, 3, 6);
-  w.spawns = w.spawns.filter(s => walkable(s.tx, s.ty));
+  sp('skar', 89, 63, { boss: 'skar' });
+  w.spawns = w.spawns.filter(s => s.dg || walkable(s.tx, s.ty));
 
   /* --- Пути (BFS) --- */
+  dgSpawns.forEach(sp2 => w.spawns.push(sp2));
   w.walk = (tx, ty) => inb(tx, ty) && !w.blk[I(tx, ty)] && w.tiles[I(tx, ty)] !== T.DEEP && w.tiles[I(tx, ty)] !== T.ROCK;
   w.get = get; w.inb = inb; w.I = I;
   w.findPath = function (sx, sy, tx, ty) {
@@ -259,10 +285,11 @@ function genWorld(seed = 1337) {
     const path = []; let c = goal; while (c !== I(sx, sy)) { path.push([c % WW, (c / WW) | 0]); c = prev[c]; } path.reverse(); return path;
   };
   w.nearestWalk = function (tx, ty) { for (let r = 0; r < 8; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (w.walk(tx + dx, ty + dy)) return [tx + dx, ty + dy]; return null; };
+  { const q = w.nearestWalk(64, 10); if (q) w.spawns.push({ id: 'ignis', tx: q[0], ty: q[1], lvl: 16, boss: 'ignis' }); }
   w.zoneName = function (px, py) {
     const tx = px / TS, ty = py / TS;
     let best = null, bd = 1e9;
-    for (const k in LOCS) { const l = LOCS[k], d = Math.hypot(tx - l.x, ty - l.y); if (d < l.r && d < bd) { best = l; bd = d; } }
+    for (const k in LOCS) { if (LOCS[k].hidden) continue; const l = LOCS[k], d = Math.hypot(tx - l.x, ty - l.y); if (d < l.r && d < bd) { best = l; bd = d; } }
     return best ? best.name : 'Дикие земли';
   };
   w.buildingByName = B;
@@ -287,3 +314,8 @@ function genWorld(seed = 1337) {
   return w;
 }
 function randiS(rng, a, b) { return a + Math.floor(rng() * (b - a + 1)); }
+
+function isSafeTile(x, y) {
+  if (y >= OW_H) return false; if (x > 34 && x < 66 && y > 33 && y < 64) return true;
+  const c = (l, r) => Math.hypot(x - l.x, y - l.y) < r; return c(LOCS.hamlet, 7) || c(LOCS.tower, 6) || c(LOCS.scout, 5) || Math.hypot(x - 41, y - 74) < 10;
+}

@@ -6,9 +6,9 @@ const qstate = id => G.prof.quests[id];
 const questActive = id => { const q = qstate(id); return !!q && q.state === 'active'; };
 const questDone = id => { const q = qstate(id); return !!q && q.state === 'done'; };
 function objProgress(q, def, i) {
-  const o = def.obj[i]; if (o.t === 'collect') return Math.min(o.n, countItem(o.id)); if (o.t === 'kill' || o.t === 'tame') return Math.min(o.n, q.prog[i] || 0); return q.prog[i] ? 1 : 0;
+  const o = def.obj[i]; if (o.t === 'collect') return Math.min(o.n, countItem(o.id)); if (['kill', 'tame', 'plant', 'harvest', 'fish', 'craft'].includes(o.t)) return Math.min(o.n, q.prog[i] || 0); return q.prog[i] ? 1 : 0;
 }
-const objNeed = o => (o.t === 'collect' || o.t === 'kill' || o.t === 'tame') ? o.n : 1;
+const objNeed = o => (o.n && ['collect', 'kill', 'tame', 'plant', 'harvest', 'fish', 'craft'].includes(o.t)) ? o.n : 1;
 function questAllObj(id) { const q = qstate(id), def = QUESTS[id]; return def.obj.every((o, i) => objProgress(q, def, i) >= objNeed(o)); }
 function questAvailable(id) {
   const d = QUESTS[id], p = G.prof; if (p.quests[id]) return false; if (d.req && !questDone(d.req)) return false; if (d.cls && d.cls !== p.cls) return false; return true;
@@ -39,13 +39,14 @@ function turnInQuest(id) {
   q.state = 'done'; const goldMul = G.events.festival ? 2 : 1;
   if (r.xp) gainXp(r.xp); if (r.gold) { addGold(r.gold * goldMul); floatText(G.P.x, G.P.y - 70, `+${r.gold * goldMul}💰`, '#fd4'); Snd.play('coin'); }
   (r.items || []).forEach(([iid, n]) => addItem(iid, n)); Snd.play('quest'); toast(`✔ Задание завершено: ${d.name}`, 'good'); logMsg(`Задание завершено: ${d.name}. Награда: ${rewardText(r)}`, 'good'); UI.dirty = true;
+  if (d.autoNext && !G.prof.quests[d.autoNext]) later(0.5, () => acceptQuest(d.autoNext));
   if (d.ending) later(1.5, () => UI.showEnding());
 }
 
 /* ---------- NPC ---------- */
 function relOf(id) { return G.prof.rel[id] || (G.prof.rel[id] = { rel: 0, talks: 0, gifts: 0, day: -1, giftDay: -1 }); }
 function relTier(v) { return v < 10 ? 'Незнакомец' : v < 30 ? 'Знакомый' : v < 60 ? 'Приятель' : v < 85 ? 'Друг' : 'Близкий друг'; }
-function shopDiscount(npcId) { let d = 0; if (G.events.market) d += 0.1; const r = relOf(npcId).rel; if (r >= 85) d += 0.1; else if (r >= 60) d += 0.05; return d; }
+function shopDiscount(npcId) { let d = 0; if (G.events.market) d += 0.1; if (!npcId) return d; const r = relOf(npcId).rel; if (r >= 85) d += 0.1; else if (r >= 60) d += 0.05; return d; }
 function spotPx(name) { const s = SPOTS[name] || SPOTS.plaza; return { x: (s[0] + 0.5) * TS, y: (s[1] + 1) * TS - 6 }; }
 function desiredSpot(def) {
   const h = gt().hf;
@@ -113,6 +114,7 @@ function onEventStart(ev, silent) {
     const bp = G.world.nearestWalk(50, 74); const b = spawnEventMon('direwolf', bp[0], bp[1], 10, 'wolfnight'); b.state = 'idle'; b.boss = true; b.sp = { boss: null };
     Snd.mood = 'battle';
   }
+  if (ev.id === 'fishing') G.fishPts = 0;
   if (ev.id === 'raid' && !silent) { G.raid = { killed: 0, total: 0, wave: 0, nextWave: G.min }; }
 }
 function raidWave() {
@@ -126,6 +128,7 @@ function onEventEnd(ev) {
     if (r.total && r.killed >= r.total * 0.7 && r.killed > 0) { addGold(300 + G.prof.lvl * 20); addItem('hp_2', 2); gainXp(150 + G.prof.lvl * 30); UI.banner('🏰 Город спасён!', `Вы отбили набег. Мэр награждает вас: ${300 + G.prof.lvl * 20} золота`); } else logMsg('Гоблины разграбили окраины. Город пострадал.', 'bad');
     G.raid = null; }
   if (ev.id === 'tourney' && G.tourney) endTourney(false);
+  if (ev.id === 'fishing' && G.fishPts > 0) { const g = Math.round(G.fishPts * 1.3) + (G.fishPts >= 250 ? 150 : 0); addGold(g); UI.banner('🎣 Итоги рыбацкого турнира', `Очков: ${G.fishPts}. Награда: ${g} золота`); G.fishPts = 0; }
 }
 function eventsOnDay(absDay) { const d0 = calc(absDay * 1440 + 720); return EVENTS.filter(ev => ev.when(d0)); }
 function upcomingEvents(n = 5) { const out = []; const t0 = gt().absDay; for (let i = 0; i < 40 && out.length < n; i++) { eventsOnDay(t0 + i).forEach(ev => out.push({ ev, absDay: t0 + i })); } return out; }
@@ -170,6 +173,10 @@ function dialogMain(n, text) {
   // предложения
   for (const id in QUESTS) { const d = QUESTS[id]; if (d.giver === def.id && questAvailable(id)) { opts.push({ label: `${d.main ? '❗' : '❔'} Есть задание: ${d.name}${p.lvl < d.lvl ? ` (рек. ур. ${d.lvl})` : ''}`, cls: 'quest', fn: () => dialogSay(n, `${d.offer}\n\n📌 ${d.desc}\n🎁 Награда: ${rewardText(d.reward)}`, [{ label: 'Принять', cls: 'quest', fn: () => { acceptQuest(id); if (d.auto) { turnInQuest(id); } dialogMain(n, 'Отлично. Удачи!'); } }, { label: 'Не сейчас', fn: () => dialogMain(n, 'Как скажешь. Я буду здесь.') }]) }); } }
   if (def.shop) opts.push({ label: '🛒 Торговать', fn: () => { closeDialog(); openShop(def.shop, n); } });
+  if (def.id === 'berta') opts.push({ label: '🍳 Кухня: приготовить блюдо', fn: () => { closeDialog(); openCraft('cook', n); } });
+  if (def.id === 'orlo') opts.push({ label: '⚗️ Алхимический стол: варить зелья', fn: () => { closeDialog(); openCraft('alch', n); } });
+  if (def.id === 'grum') opts.push({ label: '🔨 Кузнечный горн: ковка и заточка', fn: () => { closeDialog(); openCraft('smith', n); } });
+  if (def.id === 'maren') opts.push({ label: '🏗 Проекты города', fn: () => { closeDialog(); openProjects(n); } });
   if (def.inn) {
     opts.push({ label: '🛏 Снять комнату до утра (20 зол.)', fn: () => { if (p.gold < 20) return dialogMain(n, 'Комната стоит 20 золотых — увы, у вас не хватает.'); p.gold -= 20; closeDialog(); sleepAtInn(); } });
     opts.push({ label: '🍲 Горячий обед (15 зол., регенерация)', fn: () => { if (p.gold < 15) return dialogMain(n, 'Обед — 15 золотых.'); p.gold -= 15; addBuff('meal', 'Сытный обед', '🍲', { hpRegen: 3 }, 180); Snd.play('heal'); dialogMain(n, 'Кушайте на здоровье!'); } });
@@ -211,7 +218,7 @@ function buyItem(itemId) {
   const s = G.shop, it = ITEMS[itemId], price = itemPrice(it, s.def.npc), p = G.prof;
   if (p.gold < price) { toast('Не хватает золота', 'warn'); Snd.play('error'); return; }
   if (it.req > p.lvl) { toast(`Требуется уровень ${it.req}`, 'warn'); }
-  if (p.inv.length >= INV_CAP && !p.inv.some(x => x.id === itemId && x.n < it.stack)) { toast('Сумка полна', 'warn'); return; }
+  if (p.inv.length >= invCap() && !p.inv.some(x => x.id === itemId && x.n < it.stack)) { toast('Сумка полна', 'warn'); return; }
   p.gold -= price; addItem(itemId, 1, true); Snd.play('coin'); UI.dirty = true; relOf(s.def.npc).rel = Math.min(100, relOf(s.def.npc).rel + 0.3);
 }
 function buyPet(pid) {
@@ -220,7 +227,6 @@ function buyPet(pid) {
   if (p.gold < price) { toast('Не хватает золота', 'warn'); Snd.play('error'); return; } if (p.pets.length >= 8) { toast('Максимум 8 питомцев', 'warn'); return; }
   p.gold -= price; addPet(pid); Snd.play('tame'); toast(`🐾 Новый питомец: ${PETS[pid].name}`, 'good'); UI.dirty = true;
 }
-function sellPrice(it) { return Math.max(1, Math.floor(it.price * 0.4)); }
 function sellItem(idx) {
   const p = G.prof, s = p.inv[idx]; if (!s) return; const it = ITEMS[s.id]; if (it.type === 'quest' || it.price <= 0) { toast('Этот предмет нельзя продать', 'warn'); return; }
   const price = sellPrice(it); s.n--; if (s.n <= 0) p.inv.splice(idx, 1); addGold(price); Snd.play('coin'); UI.dirty = true;
@@ -229,17 +235,27 @@ function sellItem(idx) {
 /* ---------- Взаимодействие ---------- */
 function nearbyInteractable() {
   const P = G.P; let best = null, bd = 1e9;
+  if (G.fish) return { type: 'fishing', label: G.fish.state === 'bite' ? 'Подсечь!' : 'Ждать поклёвку… (E — убрать)', o: { x: P.x, y: P.y } };
   for (const n of G.npcs) { if (n.inside) continue; const d = Math.hypot(n.x - P.x, n.y - P.y); if (d < 68 && d < bd) { bd = d; best = { type: 'npc', n, label: `Поговорить: ${n.def.name}` }; } }
-  const objs = G.world.objs; for (const o of objs) {
-    if (o.t !== 'chest' && o.t !== 'herb' && o.t !== 'ore') continue; if (Math.abs(o.x - P.x) > 60 || Math.abs(o.y - P.y) > 60) continue; if (o.cd > 0) continue;
-    if (o.t === 'chest' && G.opened.has(o.id)) continue; const d = Math.hypot(o.x - P.x, o.y - 8 - P.y);
-    if (d < 52 && d < bd) { bd = d; best = { type: o.t, o, label: o.t === 'chest' ? 'Открыть сундук' : o.t === 'herb' ? 'Собрать: Лунный корень' : 'Добыть: Железная руда' }; }
+  const objs = G.world.objs; const T_OK = { chest: 1, herb: 1, ore: 1, plot: 1, portal: 1, bed: 1, bin: 1, board: 1 };
+  for (const o of objs) {
+    if (!T_OK[o.t]) continue; if (Math.abs(o.x - P.x) > 64 || Math.abs(o.y - P.y) > 64) continue; if (o.cd > 0) continue;
+    if (o.t === 'chest' && G.opened.has(o.id)) continue; const d = Math.hypot(o.x - P.x, o.y - 8 - P.y), lim = o.t === 'plot' ? 30 : o.t === 'portal' ? 46 : 52;
+    if (d < lim && d < bd) { bd = d; const lab = { chest: 'Открыть сундук', herb: 'Собрать: Лунный корень', ore: 'Добыть: Железная руда', plot: plotLabel(o), portal: o.exit ? 'Выйти из подземелья' : `Войти: ${o.label} (рек. ур. ${o.lvl})`, bed: 'Лечь спать (после 18:00)', bin: 'Ящик отгрузки', board: 'Доска заказов' }; best = { type: o.t, o, label: lab[o.t] }; }
   }
+  if (!best || bd > 24) { const w = waterAhead(); if (w && (!best || best.type !== 'npc')) best = { type: 'water', o: w, label: 'Рыбачить (удочка)' }; }
   return best;
 }
 function interact() {
   const P = G.P; if (P.dead || G.dialog || G.paused) return; const it = nearbyInteractable(); if (!it) return;
-  if (it.type === 'npc') openDialog(it.n);
+  if (it.type === 'fishing') fishPress();
+  else if (it.type === 'water') startFish(it.o);
+  else if (it.type === 'plot') plotAction(it.o);
+  else if (it.type === 'portal') usePortal(it.o);
+  else if (it.type === 'bed') sleepHome();
+  else if (it.type === 'bin') openBin();
+  else if (it.type === 'board') openBoard();
+  else if (it.type === 'npc') openDialog(it.n);
   else if (it.type === 'chest') {
     const o = it.o; G.opened.add(o.id); G.prof.opened = Array.from(G.opened); Snd.play('pickup'); const g = Math.round(o.gold * G.S.gold); addGold(g); floatText(o.x, o.y - 30, `+${g}💰`, '#fd4'); (o.loot || []).forEach(([id, n]) => addItem(id, n)); logMsg(`Сундук открыт: +${g} золота`, 'good'); burst(o.x, o.y - 14, '#ffd23a', 16, 60);
   } else { const o = it.o; addItem(o.item, 1); o.cd = 1; Snd.play('pickup'); burst(o.x, o.y - 10, o.t === 'herb' ? '#6f6' : '#fc8', 10, 40); later(90, () => { o.cd = 0; }); }
@@ -248,13 +264,13 @@ function interact() {
 /* ---------- Время / погода ---------- */
 let _lastMin = -1;
 function onMinute() {
-  updateEvents();
+  updateEvents(); { const dd = gt(); if (dd.hour === 6 && dd.minute === 0 && G.P) newDay(); }
   if (G.raid) { const r = G.raid, d = gt(); if (r.wave < 3 && G.min >= r.nextWave) { raidWave(); r.nextWave = G.min + (r.wave === 1 ? 60 : 90); } }
   const d = gt(); if (d.minute === 0 && d.hour === 5) { logMsg(`Наступило утро. ${WEEKDAYS[d.wd]}, ${d.day} ${MONTHS_GEN[d.month]}.`); }
 }
 function rainAt(m) { const d = calc(m); if (hash2(d.absDay, 3) > 0.32) return false; const s = hash2(d.absDay, 1) * 18, len = 3 + hash2(d.absDay, 2) * 6; return d.hf >= s && d.hf < s + len; }
 function updateWeather(dt) {
-  const w = G.weather; w.kind = gt().season === 3 ? 'snow' : 'rain'; w.target = (G.settings.weather && rainAt(G.min)) ? 1 : 0; w.amt += clamp(w.target - w.amt, -dt * 0.1, dt * 0.1);
+  const w = G.weather; w.kind = gt().season === 3 ? 'snow' : 'rain'; w.target = (G.settings.weather && rainAt(G.min)) ? 1 : 0; w.amt += clamp(w.target - w.amt, -dt * 0.1, dt * 0.1); if (w.amt > 0.4 && G.P && G.P.y < OW_H * TS) G.rainedToday = true;
 }
 
 /* ---------- Старт / сохранение ---------- */
@@ -266,8 +282,9 @@ function saveGame(silent) {
 }
 function startGame(prof) {
   if (!G.world) { G.world = genWorld(); }
+  prof.farm = prof.farm || {}; prof.projects = prof.projects || {}; prof.plus = prof.plus || {}; if (prof.version < 2 && !prof.quests.st1 && !prof.quests.mq1) prof.quests.st1 = { state: 'active', prog: [0], ready: false }; prof.version = 2;
   G.prof = prof; G.P = makePlayer(); G.P.buffs = []; G.min = prof.min || START_ABS_MIN; G.opened = new Set(prof.opened); G.revealed = decodeRevealed(prof.revealed);
-  G.cd = {}; G.proj = []; G.fx = []; G.texts = []; G.areas = []; G.timers = []; G.lightning = []; G.log = []; G.dialog = null; G.shop = null; G.panel = null; G.paused = false; G.target = null; G.tourney = null; G.raid = null; G.events = {}; G.potCd = { hp: 0, rs: 0 };
+  G.cd = {}; G.proj = []; G.fx = []; G.texts = []; G.areas = []; G.timers = []; G.lightning = []; G.log = []; G.dialog = null; G.shop = null; G.panel = null; G.paused = false; G.target = null; G.tourney = null; G.raid = null; G.fish = null; G.rainedToday = false; G.events = {}; G.potCd = { hp: 0, rs: 0 };
   G.world.objs.forEach(o => { if (o.cd) o.cd = 0; });
   recalc(); if (prof.hp >= 9000) { G.P.hp = G.P.maxHp; G.P.res = G.P.maxRes; } else { G.P.hp = clamp(prof.hp, 1, G.P.maxHp); G.P.res = clamp(prof.res, 0, G.P.maxRes); }
   if (CLASSES[prof.cls].res === 'rage') G.P.res = 0;

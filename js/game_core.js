@@ -37,12 +37,13 @@ function newProfile(o) {
     race: o.race, gender: o.gender, look: o.look, cls: o.cls, difficulty: o.difficulty || 'normal',
     lvl: 1, xp: 0, sp: 1, skills: {}, hp: 9999, res: 9999, gold: 60, inv: [], equip: { weapon: `w_${C.weapon}_0` },
     pos: { x: WORLD_SPAWN.x * TS, y: WORLD_SPAWN.y * TS }, min: START_ABS_MIN, quests: {}, bestiary: {}, pets: [], activePet: null, rel: {}, opened: [], defeated: [], revealed: '',
-    flags: {}, kills: 0, deaths: 0, heard: {}, version: 1
+    flags: {}, kills: 0, deaths: 0, heard: {}, version: 2, farm: {}, daily: null, projects: {}, plus: {}
   };
   for (const id in SKILLS) if (SKILLS[id].cls === o.cls && SKILLS[id].start) p.skills[id] = 1;
   p.inv = [{ id: 'hp_0', n: 3 }, { id: 'rs_0', n: 2 }, { id: 'scroll_town', n: 1 }];
   if (o.cls === 'hunter') p.inv.push({ id: 'lure', n: 4 }, { id: 'treat', n: 2 });
   if (o.cls === 'mage') p.equip.body = 'a_cloth_body_0';
+  p.quests.st1 = { state: 'active', prog: [0], ready: false };
   return p;
 }
 
@@ -56,9 +57,9 @@ function isNight() { return nightAmount() > 0.5; }
 /* ===== Статы ===== */
 function recalc() {
   const p = G.prof, C = CLASSES[p.cls], R = RACES[p.race], L = p.lvl, P = G.P;
-  const s = { maxHp: C.base.hp + C.growth.hp * (L - 1), maxRes: C.base.res, dmg: C.base.dmg + C.growth.dmg * (L - 1), def: C.base.def + C.growth.def * (L - 1), spd: C.base.spd, crit: C.base.crit, critDmg: 1.5, dodge: 0, regen: C.base.regen, hpRegen: p.cls === 'druid' ? 1.2 : 0.4, lifesteal: 0, luck: 1, xp: 1, gold: 1, atkSpd: 1, dr: 0, range: 1, petDmg: 0, petHp: 0 };
+  const s = { maxHp: C.base.hp + C.growth.hp * (L - 1), maxRes: C.base.res, dmg: C.base.dmg + C.growth.dmg * 0.8 * (L - 1), def: C.base.def + C.growth.def * (L - 1), spd: C.base.spd, crit: C.base.crit, critDmg: 1.5, dodge: 0, regen: C.base.regen, hpRegen: p.cls === 'druid' ? 1.2 : 0.4, lifesteal: 0, luck: 1, xp: 1, gold: 1, atkSpd: 1, dr: 0, range: 1, petDmg: 0, petHp: 0 };
   const add = (st) => { for (const k in st) { const v = st[k]; switch (k) { case 'hp': s.maxHp += v; break; case 'res': s.maxRes += v; break; case 'luck': s.luck += v; break; case 'xp': s.xp += v; break; default: s[k] = (s[k] || 0) + v; } } };
-  for (const sl in p.equip) { const it = ITEMS[p.equip[sl]]; if (it) add(it.stats); }
+  for (const sl in p.equip) { const it = ITEMS[p.equip[sl]]; if (!it) continue; const pl = (p.plus && p.plus[sl]) || 0, st = Object.assign({}, it.stats); if (pl) { if (st.dmg) st.dmg *= 1 + 0.1 * pl; if (st.def) st.def *= 1 + 0.1 * pl; if (st.hp) st.hp *= 1 + 0.1 * pl; } add(st); }
   const m = R.mods; if (m.xp) s.xp *= m.xp; if (m.crit) s.crit += m.crit; if (m.regen) s.regen *= m.regen; if (m.def) s.def *= m.def; if (m.gold) s.gold *= m.gold; if (m.dmg) s.dmg *= m.dmg; if (m.hp) s.maxHp *= m.hp; if (m.dodge) s.dodge += m.dodge; if (m.luck) s.luck *= m.luck;
   const sk = id => p.skills[id] || 0, sv = id => SKILLS[id].v[sk(id) - 1];
   if (sk('bloodlust')) s.lifesteal += sv('bloodlust') / 100; if (sk('unbroken')) s.maxHp *= 1 + sv('unbroken') / 100;
@@ -91,11 +92,11 @@ function weaponData() { const it = ITEMS[G.prof.equip.weapon]; return it ? { wty
 function armorTiers() { const e = G.prof.equip, f = s => e[s] ? ITEMS[e[s]].tier : -1; return { body: f('body'), head: f('head'), boots: f('boots') }; }
 
 /* ===== Инвентарь ===== */
-const INV_CAP = 40;
+function invCap() { return 40 + (G.prof && G.prof.projects && G.prof.projects.bag ? 10 : 0); }
 function addItem(id, n = 1, silent) {
   const it = ITEMS[id]; if (!it) return 0; const inv = G.prof.inv; let left = n;
   for (const s of inv) { if (s.id === id && s.n < it.stack && left > 0) { const a = Math.min(left, it.stack - s.n); s.n += a; left -= a; } }
-  while (left > 0 && inv.length < INV_CAP) { const a = Math.min(left, it.stack); inv.push({ id, n: a }); left -= a; }
+  while (left > 0 && inv.length < invCap()) { const a = Math.min(left, it.stack); inv.push({ id, n: a }); left -= a; }
   if (left > 0) { logMsg('Сумка полна!', 'warn'); Snd.play('error'); }
   const got = n - left;
   if (got > 0 && !silent) { logMsg(`Получено: ${it.icon} ${it.name}${got > 1 ? ' ×' + got : ''}`, 'item'); Snd.play('pickup'); if (G.P) floatText(G.P.x, G.P.y - 50, `+${it.icon}`, '#fff'); }
@@ -124,7 +125,7 @@ function equipItem(idx) {
   if (G.P && G.P.form) setForm(null, true);
   recalc(); Snd.play('click'); logMsg(`Надето: ${it.icon} ${it.name}`); UI.dirty = true;
 }
-function unequip(slot) { const p = G.prof, id = p.equip[slot]; if (!id) return; if (p.inv.length >= INV_CAP) { toast('Сумка полна', 'warn'); return; } delete p.equip[slot]; addItem(id, 1, true); recalc(); Snd.play('click'); UI.dirty = true; }
+function unequip(slot) { const p = G.prof, id = p.equip[slot]; if (!id) return; if (p.inv.length >= invCap()) { toast('Сумка полна', 'warn'); return; } delete p.equip[slot]; addItem(id, 1, true); recalc(); Snd.play('click'); UI.dirty = true; }
 function itemStatsText(it) {
   const names = { dmg: 'Урон', def: 'Защита', hp: 'Здоровье', res: 'Ресурс', crit: 'Крит', critDmg: 'Крит. урон', spd: 'Скорость', regen: 'Восст. ресурса', lifesteal: 'Вампиризм', luck: 'Удача', xp: 'Опыт' };
   return Object.keys(it.stats || {}).map(k => { const v = it.stats[k], pct = ['crit', 'critDmg', 'lifesteal', 'luck', 'xp'].includes(k); return `${names[k] || k} +${pct ? Math.round(v * 100) + '%' : (Number.isInteger(v) ? v : v.toFixed(1))}`; });
